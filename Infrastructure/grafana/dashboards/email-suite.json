@@ -1,0 +1,91 @@
+{
+    "dashboard": {
+        "id": null,
+        "title": "Email Suite Analytics",
+        "tags": [
+            "email",
+            "tracking",
+            "analytics"
+        ],
+        "timezone": "browser",
+        "panels": [
+            {
+                "id": 1,
+                "title": "Email Tracking Overview",
+                "type": "stat",
+                "targets": [
+                    {
+                        "expr": "sum(emails_tracked_total)",
+                        "legendFormat": "Total Emails Tracked"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 0
+                }
+            },
+            {
+                "id": 2,
+                "title": "Email Opens & Clicks",
+                "type": "timeseries",
+                "targets": [
+                    {
+                        "expr": "rate(email_opens_total[5m])",
+                        "legendFormat": "Open Rate"
+                    },
+                    {
+                        "expr": "rate(link_clicks_total[5m])",
+                        "legendFormat": "Click Rate"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 0
+                }
+            },
+            {
+                "id": 3,
+                "title": "API Response Times",
+                "type": "histogram",
+                "targets": [
+                    {
+                        "expr": "http_request_duration_seconds_bucket",
+                        "legendFormat": "Response Time"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 8
+                }
+            },
+            {
+                "id": 4,
+                "title": "User Plan Distribution",
+                "type": "piechart",
+                "targets": [
+                    {
+                        "expr": "sum by (user_plan) (emails_tracked_total)",
+                        "legendFormat": "{{user_plan}}"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 8
+                }
+            }
+        ],
+        "time": {
+            "from": "now-6h",
+            "to": "now"
+        },
+        "refresh": "5s"
+    }
+}

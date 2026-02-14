@@ -1,0 +1,163 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Your models remain the same...
+model User {
+    id            String   @id @default(cuid())
+    email         String   @unique
+    name          String?
+    plan          Plan     @default(FREE)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+    lastLoginAt   DateTime?
+    avatar        String?
+    emailVerified Boolean  @default(false)
+
+    trackedEmails  TrackedEmail[]
+    campaigns      Campaign[]
+    subscriptions  Subscription[]
+    aiInsights     AIInsight[]
+    campaignTemplates CampaignTemplate[]
+
+    @@map("users")
+}
+
+model TrackedEmail {
+    id          String    @id @default(cuid())
+    trackingId  String    @unique
+    userId      String
+    recipient   String
+    subject     String?
+    messageId   String?
+    // Add this field
+    campaignId  String?
+    createdAt   DateTime  @default(now())
+
+    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // Add this optional relation
+    campaign    Campaign? @relation(fields: [campaignId], references: [id])
+    opens       EmailOpen[]
+    clicks      LinkClick[]
+
+    @@index([userId])
+    @@index([createdAt])
+    @@index([trackingId])
+    @@index([campaignId]) // Add index
+    @@map("tracked_emails")
+
+    // Relations
+    // user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailOpen {
+    id             String   @id @default(cuid())
+    trackedEmailId String
+    ipAddress      String?
+    userAgent      String?
+    location       String?
+    deviceType     String?
+    timestamp      DateTime @default(now())
+
+    trackedEmail TrackedEmail @relation(fields: [trackedEmailId], references: [id], onDelete: Cascade)
+}
+
+model LinkClick {
+    id             String   @id @default(cuid())
+    trackedEmailId String
+    url            String
+    ipAddress      String?
+    userAgent      String?
+    timestamp      DateTime @default(now())
+
+    trackedEmail TrackedEmail @relation(fields: [trackedEmailId], references: [id], onDelete: Cascade)
+}
+
+model Campaign {
+    id          String         @id @default(cuid())
+    userId      String
+    name        String
+    subject     String         
+    body        String         
+    recipientList Json         
+    status      CampaignStatus @default(DRAFT)
+    scheduledAt DateTime?
+    createdAt   DateTime       @default(now())
+    trackedEmails TrackedEmail[]
+
+    
+    @@index([userId])
+    @@index([status])
+    @@map("campaigns")
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+    id                   String   @id @default(cuid())
+    userId               String
+    stripeSubscriptionId String   @unique
+    stripeCustomerId     String
+    plan                 Plan
+    status               String
+    currentPeriodStart   DateTime
+    currentPeriodEnd     DateTime
+    cancelAtPeriodEnd    Boolean  @default(false)
+    createdAt            DateTime @default(now())
+    updatedAt            DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+model AIInsight {
+    id          String   @id @default(cuid())
+    userId      String
+    type        String // 'performance', 'engagement', 'recommendation'
+    data        Json
+    generatedAt DateTime @default(now())
+    expiresAt   DateTime?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, type])
+}
+model CampaignTemplate {
+    id        String   @id @default(cuid())
+    userId    String
+    name      String
+    subject   String
+    body      String
+    category  String   @default("general")
+    variables Json     // For storing template variables
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    
+    @@index([userId])
+    @@map("campaign_templates")
+}
+
+enum Plan {
+    FREE
+    PRO
+    BUSINESS
+    ENTERPRISE
+}
+
+enum CampaignStatus {
+    DRAFT
+    SCHEDULED
+    SENDING
+    COMPLETED
+    FAILED
+}

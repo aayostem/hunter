@@ -1,0 +1,41 @@
+{
+    "name": "email-suite-platform",
+    "version": "1.0.0",
+    "description": "Complete email tracking and analytics platform",
+    "type": "module",
+    "workspaces": [
+        "backend",
+        "frontend/web-dashboard",
+        "frontend/chrome-extension",
+        "clients/javascript",
+        "shared"
+    ],
+    "scripts": {
+        "install:all": "npm install && npm run install:backend && npm run install:dashboard && npm run install:extension && npm run install:clients",
+        "install:backend": "cd backend && npm install",
+        "install:dashboard": "cd frontend/web-dashboard && npm install",
+        "install:extension": "cd frontend/chrome-extension && npm install",
+        "install:clients": "cd clients/javascript && npm install",
+        "dev": "concurrently \"npm run dev:backend\" \"npm run dev:dashboard\"",
+        "dev:backend": "cd backend && npm run dev",
+        "dev:dashboard": "cd frontend/web-dashboard && npm run dev",
+        "dev:extension": "cd frontend/chrome-extension && npm run dev",
+        "build": "npm run build:backend && npm run build:dashboard && npm run build:extension",
+        "build:backend": "cd backend && npm run build",
+        "build:dashboard": "cd frontend/web-dashboard && npm run build",
+        "build:extension": "cd frontend/chrome-extension && npm run build",
+        "test": "npm run test:backend",
+        "test:backend": "cd backend && npm test",
+        "docker:dev": "docker-compose up -d",
+        "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
+        "db:migrate": "cd backend && npx prisma migrate dev",
+        "db:studio": "cd backend && npx prisma studio"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.0",
+        "typescript": "^5.0.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

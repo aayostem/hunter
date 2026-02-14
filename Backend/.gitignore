@@ -1,0 +1,43 @@
+# íº€ Email Suite - Git Ignore File
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Database
+postgres_data/
+redis_data/
+
+# Dependencies (root)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Keep sample files
+!.env.example

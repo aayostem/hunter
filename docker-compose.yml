@@ -1,0 +1,77 @@
+version: "3.8"
+services:
+  postgres:
+    image: postgres:15-alpine # Use Alpine version for smaller size
+    environment:
+      POSTGRES_DB: emailsuite
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Add resource limits and performance optimizations
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5" # Limit to half a CPU core
+          memory: 512M # Limit memory to 512MB
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c effective_cache_size=256MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=50  # Reduce from default 100
+
+  redis:
+    image: redis:7-alpine # Already using Alpine
+    ports:
+      - "6379:6379"
+    # Add resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+  api-gateway:
+    build:
+      context: ./backend
+      # Add Dockerfile optimizations if you control the build
+      args:
+        NODE_ENV: production # Build in production mode for smaller image
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/emailsuite
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    # Add resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    # Add health check to prevent premature connections
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:

@@ -1,0 +1,80 @@
+{
+    "Comment": "Email Suite CDN Distribution",
+    "Origins": [
+        {
+            "Id": "S3Origin",
+            "DomainName": "emailsuite-assets.s3.amazonaws.com",
+            "S3OriginConfig": {
+                "OriginAccessIdentity": ""
+            }
+        },
+        {
+            "Id": "APIGateway",
+            "DomainName": "api.emailsuite.com",
+            "CustomOriginConfig": {
+                "HTTPPort": 80,
+                "HTTPSPort": 443,
+                "OriginProtocolPolicy": "https-only"
+            }
+        }
+    ],
+    "DefaultCacheBehavior": {
+        "TargetOriginId": "S3Origin",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "TrustedSigners": {
+            "Enabled": false,
+            "Quantity": 0
+        },
+        "ForwardedValues": {
+            "QueryString": false,
+            "Cookies": {
+                "Forward": "none"
+            },
+            "Headers": {
+                "Quantity": 0
+            }
+        },
+        "MinTTL": 0,
+        "Compress": true,
+        "DefaultTTL": 86400,
+        "MaxTTL": 31536000
+    },
+    "CacheBehaviors": [
+        {
+            "PathPattern": "/api/track/pixel/*",
+            "TargetOriginId": "APIGateway",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "ForwardedValues": {
+                "QueryString": true,
+                "Cookies": {
+                    "Forward": "none"
+                },
+                "Headers": {
+                    "Quantity": 2,
+                    "Items": [
+                        "User-Agent",
+                        "Referer"
+                    ]
+                }
+            },
+            "MinTTL": 0,
+            "DefaultTTL": 0,
+            "MaxTTL": 0
+        }
+    ],
+    "CustomErrorResponses": [
+        {
+            "ErrorCode": 404,
+            "ResponsePagePath": "/index.html",
+            "ResponseCode": "200"
+        }
+    ],
+    "PriceClass": "PriceClass_All",
+    "Enabled": true,
+    "ViewerCertificate": {
+        "CloudFrontDefaultCertificate": false,
+        "ACMCertificateArn": "arn:aws:acm:us-east-1:account:certificate/id",
+        "SSLSupportMethod": "sni-only",
+        "MinimumProtocolVersion": "TLSv1.2_2021"
+    }
+}

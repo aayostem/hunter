@@ -1,0 +1,424 @@
+# 🚀 Email Suite - Git Ignore File
+
+# ============================
+# 📁 Operating System Files
+# ============================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
+
+# Windows
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Linux
+*~
+
+# ============================
+# 📦 Node.js & JavaScript
+# ============================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+*.tsbuildinfo
+
+# Coverage directories
+coverage/
+.nyc_output/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# ============================
+# 🐳 Docker & Containers
+# ============================
+
+# Docker compose
+.env
+docker-compose.override.yml
+
+# Docker build artifacts
+**/dist/
+**/build/
+
+# ============================
+# 🔧 IDE & Editor Files
+# ============================
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.sublime-*
+
+# ============================
+# 🗄️ Database & Storage
+# ============================
+
+# PostgreSQL
+*.pid
+*.socket
+postgres_data/
+
+# Redis
+redis_data/
+dump.rdb
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================
+# 🔒 Environment & Secrets
+# ============================
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging.local
+
+# Secret files
+secrets/
+*.key
+*.pem
+*.crt
+*.cer
+
+# SSL certificates
+ssl/
+certificates/
+
+# ============================
+# 📊 Logs
+# ============================
+
+# Log files
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ============================
+# 🏗️ Build Outputs
+# ============================
+
+# TypeScript
+dist/
+build/
+out/
+
+# Chrome Extension
+.crx/
+*.crx
+
+# Production build
+.next/
+.nuxt/
+.gatsby/
+
+# ============================
+# 🧪 Testing
+# ============================
+
+# Test results
+test-results/
+**/__snapshots__/
+
+# Playwright
+playwright-report/
+test-results/
+
+# ============================
+# 🐍 Python
+# ============================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# ============================
+# 🌐 Frontend Build Artifacts
+# ============================
+
+# Vite
+.vite/
+*.tgz
+
+# Next.js
+.next/
+
+# Svelte
+.svelte-kit/
+
+# ============================
+# 🎯 Project Specific
+# ============================
+
+# Prisma
+**/prisma/migrations/
+!**/prisma/migrations/**/*.sql
+**/prisma/*.db
+
+# Backend
+backend/.env
+backend/dist/
+
+# Frontend
+frontend/web-dashboard/dist/
+frontend/web-dashboard/.env
+
+# Chrome Extension
+frontend/chrome-extension/dist/
+frontend/chrome-extension/*.crx
+
+# Clients
+clients/javascript/dist/
+
+# Uploads
+uploads/
+tmp/
+temp/
+
+# ============================
+# 📱 OS Generated
+# ============================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ============================
+# 🏢 Package Manager Specific
+# ============================
+
+# npm
+package-lock.json
+npm-shrinkwrap.json
+
+# Yarn
+.yarn/
+.yarnrc
+yarn.lock
+.yarn-integrity
+
+# pnpm
+pnpm-lock.yaml
+
+# ============================
+# 🧹 Temporary Files
+# ============================
+
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ============================
+# 📝 Documentation
+# ============================
+
+# Generated documentation
+docs/build/
+docs/_build/
+
+# ============================
+# 🎨 Design Files
+# ============================
+
+# Figma
+*.fig
+
+# Sketch
+*.sketch
+
+# Adobe
+*.ai
+*.psd
+*.xd
+
+# ============================
+# 🚨 Security
+# ============================
+
+# Security sensitive files
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+
+# ============================
+# 📊 Analytics & Monitoring
+# ============================
+
+# Prometheus
+prometheus_data/
+
+# Grafana
+grafana_data/
+
+# ============================
+# 🔌 Plugin & Extension
+# ============================
+
+# Chrome Extension
+*.pem
+
+# ============================
+# 💾 Backup Files
+# ============================
+
+*.old
+*.orig
+*.save
+
+# ============================
+# 📁 Custom Directories
+# ============================
+
+# Development directories
+.dev/
+.development/
+
+# Backup directories
+backups/
+
+# Cache directories
+.cache/
+
+# ============================
+# 🎯 Files to Keep (Exceptions)
+# ============================
+
+# Keep these files
+!.vscode/settings.json.example
+!.vscode/extensions.json.example
+
+# Keep Prisma migrations (but not the .db files)
+!**/prisma/migrations/
+**/prisma/migrations/**/*.sql
+
+# Keep sample environment files
+!.env.example
+!**/.env.example
+
+# ============================
+# 🚫 Binary Files
+# ============================
+
+# Compiled binary addons
+*.node
+
+# Executables
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ============================
+# 📈 Metrics & Reports
+# ============================
+
+# Bundle size reports
+stats.html
+profiler.html
+
+# ============================
+# 🎪 Misc
+# ============================
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Media
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Documents
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+
+Makefile

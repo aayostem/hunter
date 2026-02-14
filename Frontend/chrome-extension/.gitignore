@@ -1,0 +1,7 @@
+# Chrome extension specific ignores
+dist/
+*.crx
+*.pem
+.env
+node_modules/
+.DS_Store
