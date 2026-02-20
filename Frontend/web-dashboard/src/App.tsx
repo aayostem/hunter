@@ -14,7 +14,9 @@ import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { Navigation } from "./components/Navigation";
 import { Sidebar } from "./components/Sidebar";
+import { ThemeProvider } from './hooks/useTheme'; 
 import "./index.css";
+import { PermissionsProvider } from "./hooks/usePermissions";
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -96,9 +98,14 @@ const AppContent = () => {
 function App() {
   return (
     <Router>
+      <ThemeProvider defaultTheme="system"> 
       <AuthProvider>
+        <PermissionsProvider>
+
         <AppContent />
+        </PermissionsProvider>
       </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

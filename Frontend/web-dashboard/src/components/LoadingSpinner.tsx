@@ -1,56 +1,71 @@
+// components/LoadingSpinner.tsx
 import React from 'react';
 
-interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
-  color?: 'blue' | 'gray' | 'white';
-  fullScreen?: boolean;
+export type SpinnerSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type SpinnerVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'white';
+
+export interface LoadingSpinnerProps {
+  size?: SpinnerSize;
+  variant?: SpinnerVariant;
   text?: string;
+  fullScreen?: boolean;
+  overlay?: boolean;
+  className?: string;
+  testId?: string;
 }
 
-export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
-  size = 'md', 
-  color = 'blue',
-  fullScreen = false,
-  text
-}) => {
-  const sizeClasses = {
-    sm: 'w-5 h-5',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12'
-  };
+const SIZE_MAP: Record<SpinnerSize, { width: number; height: number; borderWidth: number }> = {
+  xs: { width: 12, height: 12, borderWidth: 2 },
+  sm: { width: 16, height: 16, borderWidth: 2 },
+  md: { width: 24, height: 24, borderWidth: 3 },
+  lg: { width: 32, height: 32, borderWidth: 3 },
+  xl: { width: 48, height: 48, borderWidth: 4 },
+};
 
-  const colorClasses = {
-    blue: 'text-blue-600',
-    gray: 'text-gray-600',
-    white: 'text-white'
-  };
+const VARIANT_MAP: Record<SpinnerVariant, { border: string; borderTop: string }> = {
+  primary: { border: '#E5E7EB', borderTop: '#3B82F6' },
+  secondary: { border: '#E5E7EB', borderTop: '#6B7280' },
+  success: { border: '#E5E7EB', borderTop: '#10B981' },
+  warning: { border: '#E5E7EB', borderTop: '#F59E0B' },
+  danger: { border: '#E5E7EB', borderTop: '#EF4444' },
+  white: { border: 'rgba(255,255,255,0.3)', borderTop: '#FFFFFF' },
+};
+
+export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
+  size = 'md',
+  variant = 'primary',
+  text,
+  fullScreen = false,
+  overlay = false,
+  className = '',
+  testId,
+}) => {
+  const spinnerSize = SIZE_MAP[size];
+  const spinnerVariant = VARIANT_MAP[variant];
 
   const spinner = (
-    <div className="flex flex-col items-center justify-center space-y-3">
-      <div className={`${sizeClasses[size]} ${colorClasses[color]} animate-spin`}>
-        <svg
-          className="w-full h-full"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
-      </div>
+    <div
+      className={`flex flex-col items-center justify-center ${className}`}
+      role="status"
+      aria-label={text || 'Loading'}
+      data-testid={testId}
+    >
+      <div
+        style={{
+          width: spinnerSize.width,
+          height: spinnerSize.height,
+          borderWidth: spinnerSize.borderWidth,
+          borderColor: spinnerVariant.border,
+          borderTopColor: spinnerVariant.borderTop,
+        }}
+        className="rounded-full animate-spin"
+      />
       {text && (
-        <p className={`text-sm ${color === 'white' ? 'text-white' : 'text-gray-600'}`}>
+        <p
+          className={`mt-3 text-sm ${
+            variant === 'white' ? 'text-white' : 'text-gray-600'
+          }`}
+        >
           {text}
         </p>
       )}
@@ -59,7 +74,15 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        {spinner}
+      </div>
+    );
+  }
+
+  if (overlay) {
+    return (
+      <div className="absolute inset-0 bg-white bg-opacity-75 z-10 flex items-center justify-center">
         {spinner}
       </div>
     );
@@ -68,24 +91,27 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   return spinner;
 };
 
-// Also export a skeleton loading variant
-export const TableSkeleton: React.FC = () => {
-  return (
-    <div className="animate-pulse">
-      <div className="h-8 bg-gray-200 rounded w-full mb-4"></div>
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="h-16 bg-gray-100 rounded w-full mb-2"></div>
-      ))}
-    </div>
-  );
-};
+// Full page loading component
+export const FullPageSpinner: React.FC<Omit<LoadingSpinnerProps, 'fullScreen'>> = (props) => (
+  <LoadingSpinner {...props} fullScreen />
+);
 
-export const CardSkeleton: React.FC = () => {
-  return (
-    <div className="animate-pulse bg-white rounded-xl p-6 border border-gray-100">
-      <div className="h-12 w-12 bg-gray-200 rounded-lg mb-4"></div>
-      <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-      <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-    </div>
-  );
-};
+// Content loading component
+export const ContentSpinner: React.FC<Omit<LoadingSpinnerProps, 'overlay'>> = (props) => (
+  <LoadingSpinner {...props} overlay />
+);
+
+// Inline loading component
+export const InlineSpinner: React.FC<LoadingSpinnerProps> = (props) => (
+  <div className="inline-flex items-center">
+    <LoadingSpinner {...props} />
+  </div>
+);
+
+// Button spinner component
+export const ButtonSpinner: React.FC<{ size?: SpinnerSize; variant?: SpinnerVariant }> = ({
+  size = 'sm',
+  variant = 'white',
+}) => (
+  <LoadingSpinner size={size} variant={variant} className="inline-block" />
+);

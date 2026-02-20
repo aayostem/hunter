@@ -1,327 +1,298 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, 
-  Send,
-  Users,
-  Calendar,
-  Settings,
-  Eye
+  Send, Users, Calendar, Settings, Eye, Loader, Bold, Monitor, Smartphone, Italic,
+  WifiOff, CheckCircle, Search
 } from 'lucide-react';
+
+import { useAuth, User } from '../hooks/useAuth';
+import { useToast } from '../hooks/useToast';
+import { api } from '../lib/api';
+import useDebounce from '../utils/usedebounce';
+
+// --- Local Types for Type Safety ---
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+}
+
+export type TemplateCategory = 'blank' | 'welcome' | 'newsletter' | 'promotional' | 'announcement';
+
+interface Template {
+  id: string;
+  name: string;
+  category: TemplateCategory;
+  subject: string;
+  content: string;
+  thumbnail: string;
+  isDefault: boolean;
+}
+
+interface ContactList {
+  id: string;
+  name: string;
+  description: string | null;
+  activeCount: number;
+}
+
+interface CampaignData {
+  name: string;
+  subject: string;
+  content: string;
+  listIds: string[];
+  schedule: 'now' | 'later';
+  fromName: string; // Added to use the user object
+}
+
+const STEPS = [
+  { number: 1, name: 'Info', icon: Settings },
+  { number: 2, name: 'Design', icon: Eye },
+  { number: 3, name: 'Audience', icon: Users },
+  { number: 4, name: 'Review', icon: Calendar },
+];
 
 export const CreateCampaign: React.FC = () => {
   const navigate = useNavigate();
+  // Fixed: Explicit type instead of 'any', and used 'user'
+  const { user, token } = useAuth() as AuthContextType; 
+  const { showToast } = useToast();
+
+  // --- State ---
   const [step, setStep] = useState(1);
-  const [campaignData, setCampaignData] = useState({
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [lists, setLists] = useState<ContactList[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 500);
+
+  const [campaignData, setCampaignData] = useState<CampaignData>({
     name: '',
     subject: '',
-    fromName: '',
-    fromEmail: '',
-    replyTo: '',
-    template: 'blank',
     content: '',
-    list: '',
+    listIds: [],
     schedule: 'now',
-    scheduledDate: ''
+    fromName: user?.name || '', // Fixed: 'user' is now used
   });
 
-  const steps = [
-    { number: 1, name: 'Campaign Info', icon: Settings },
-    { number: 2, name: 'Design Email', icon: Eye },
-    { number: 3, name: 'Select Audience', icon: Users },
-    { number: 4, name: 'Schedule', icon: Calendar },
-  ];
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
 
-  const renderStep = () => {
-    switch(step) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Campaign Name
-              </label>
-              <input
-                type="text"
-                value={campaignData.name}
-                onChange={(e) => setCampaignData({...campaignData, name: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Welcome Series"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Subject
-              </label>
-              <input
-                type="text"
-                value={campaignData.subject}
-                onChange={(e) => setCampaignData({...campaignData, subject: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Welcome to our community!"
-              />
-            </div>
+  // --- Network Listener ---
+  useEffect(() => {
+    const toggleOnline = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', toggleOnline);
+    window.addEventListener('offline', toggleOnline);
+    return () => {
+      window.removeEventListener('online', toggleOnline);
+      window.removeEventListener('offline', toggleOnline);
+    };
+  }, []);
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  From Name
-                </label>
-                <input
-                  type="text"
-                  value={campaignData.fromName}
-                  onChange={(e) => setCampaignData({...campaignData, fromName: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="Your Company"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  From Email
-                </label>
-                <input
-                  type="email"
-                  value={campaignData.fromEmail}
-                  onChange={(e) => setCampaignData({...campaignData, fromEmail: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="noreply@company.com"
-                />
-              </div>
-            </div>
+  // --- Data Fetching ---
+  const fetchData = useCallback(async () => {
+    if (!token) return;
+    try {
+      setLoadingTemplates(true);
+      const [tplRes, listRes] = await Promise.all([
+        api.get<Template[]>('/templates', { params: { search: debouncedSearch } }),
+        api.get<ContactList[]>('/contacts/lists')
+      ]);
+      setTemplates(tplRes.data);
+      setLists(listRes.data);
+    } catch {
+      showToast('Failed to load campaign resources', 'error');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, [token, debouncedSearch, showToast]);
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Reply-To Email
-              </label>
-              <input
-                type="email"
-                value={campaignData.replyTo}
-                onChange={(e) => setCampaignData({...campaignData, replyTo: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                placeholder="support@company.com"
-              />
-            </div>
-          </div>
-        );
-      
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Template
-              </label>
-              <select
-                value={campaignData.template}
-                onChange={(e) => setCampaignData({...campaignData, template: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2"
-              >
-                <option value="blank">Blank Template</option>
-                <option value="welcome">Welcome Email</option>
-                <option value="newsletter">Newsletter</option>
-                <option value="promotional">Promotional</option>
-                <option value="announcement">Announcement</option>
-              </select>
-            </div>
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Content
-              </label>
-              <textarea
-                value={campaignData.content}
-                onChange={(e) => setCampaignData({...campaignData, content: e.target.value})}
-                rows={10}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 font-mono"
-                placeholder="Write your email content here... HTML supported"
-              />
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Tip:</strong> Use {'{{name}}'} to personalize emails with recipient's name
-              </p>
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Contact List
-              </label>
-              <select
-                value={campaignData.list}
-                onChange={(e) => setCampaignData({...campaignData, list: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2"
-              >
-                <option value="">Choose a list...</option>
-                <option value="all">All Contacts (12,345)</option>
-                <option value="customers">Customers (8,234)</option>
-                <option value="leads">Leads (4,111)</option>
-                <option value="newsletter">Newsletter Subscribers (6,789)</option>
-              </select>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-medium mb-3">List Statistics</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Contacts:</span>
-                  <span className="font-medium">12,345</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Active Subscribers:</span>
-                  <span className="font-medium">10,234</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Unsubscribed:</span>
-                  <span className="font-medium">2,111</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Schedule
-              </label>
-              <div className="space-y-3">
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    value="now"
-                    checked={campaignData.schedule === 'now'}
-                    onChange={(e) => setCampaignData({...campaignData, schedule: e.target.value})}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span>Send immediately</span>
-                </label>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    value="later"
-                    checked={campaignData.schedule === 'later'}
-                    onChange={(e) => setCampaignData({...campaignData, schedule: e.target.value})}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span>Schedule for later</span>
-                </label>
-              </div>
-            </div>
-
-            {campaignData.schedule === 'later' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date and Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={campaignData.scheduledDate}
-                  onChange={(e) => setCampaignData({...campaignData, scheduledDate: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-            )}
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-medium text-yellow-800 mb-2">Estimated Delivery</h4>
-              <p className="text-sm text-yellow-700">
-                Approximately 10,234 emails will be sent. Estimated delivery time: 15 minutes
-              </p>
-            </div>
-          </div>
-        );
+  // --- Handlers ---
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    try {
+      await api.post('/campaigns/draft', campaignData);
+      showToast('Draft saved successfully', 'success');
+    } catch {
+      showToast('Failed to save draft', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Campaigns
-      </button>
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const res = await api.post<{ id: string }>('/campaigns', campaignData);
+      showToast('Campaign launched!', 'success');
+      navigate(`/campaigns/${res.data.id}`);
+    } catch {
+      showToast('Launch failed', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Create New Campaign</h1>
+  const estimatedCount = useMemo(() => {
+    return lists
+      .filter(l => campaignData.listIds.includes(l.id))
+      .reduce((sum, l) => sum + l.activeCount, 0);
+  }, [lists, campaignData.listIds]);
 
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            {steps.map((s) => (
-              <div
-                key={s.number}
-                className={`flex items-center ${
-                  s.number < steps.length ? 'flex-1' : ''
-                }`}
-              >
-                <div className="flex items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      s.number <= step
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-600'
-                    }`}
-                  >
-                    <s.icon className="w-5 h-5" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Step {s.number}</p>
-                    <p className="text-xs text-gray-500">{s.name}</p>
-                  </div>
-                </div>
-                {s.number < steps.length && (
-                  <div className="flex-1 mx-4">
-                    <div
-                      className={`h-1 rounded ${
-                        s.number < step ? 'bg-blue-600' : 'bg-gray-200'
-                      }`}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+  // --- Step Views ---
+  const renderStep1 = () => (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">Campaign Name</label>
+        <input 
+          className="w-full p-2 border rounded-md" 
+          placeholder="e.g., Summer Newsletter"
+          value={campaignData.name}
+          onChange={e => setCampaignData({...campaignData, name: e.target.value})}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Subject Line</label>
+        <input 
+          className="w-full p-2 border rounded-md" 
+          placeholder="What will users see in their inbox?"
+          value={campaignData.subject}
+          onChange={e => setCampaignData({...campaignData, subject: e.target.value})}
+        />
+      </div>
+    </div>
+  );
+
+  const renderStep2 = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <input 
+            className="pl-9 w-full p-2 border rounded-md text-sm" 
+            placeholder="Search templates..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+      </div>
 
-        {/* Step Content */}
-        {renderStep()}
-
-        {/* Navigation Buttons */}
-        <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
-          <button
-            onClick={() => setStep(Math.max(1, step - 1))}
-            disabled={step === 1}
-            className={`px-6 py-2 rounded-lg ${
-              step === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Previous
-          </button>
-          
-          {step < 4 ? (
-            <button
-              onClick={() => setStep(step + 1)}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+      {loadingTemplates ? (
+        <div className="flex justify-center py-10"><Loader className="animate-spin" /></div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 mb-4 overflow-y-auto max-h-40">
+          {templates.map(t => (
+            <div 
+              key={t.id} 
+              onClick={() => setCampaignData({...campaignData, content: t.content})}
+              className={`cursor-pointer p-2 border rounded hover:border-blue-500 text-xs text-center ${campaignData.content === t.content ? 'border-blue-500 bg-blue-50' : ''}`}
             >
-              Next Step
-            </button>
+              {t.name}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex justify-between items-center bg-gray-50 p-2 rounded-t-lg border">
+        <div className="flex gap-2 text-gray-400">
+          <Bold className="w-4 h-4 cursor-not-allowed" /> <Italic className="w-4 h-4 cursor-not-allowed" />
+        </div>
+        <div className="flex gap-2">
+          <Monitor onClick={() => setPreviewMode('desktop')} className={`w-4 h-4 cursor-pointer ${previewMode === 'desktop' ? 'text-blue-600' : 'text-gray-400'}`} />
+          <Smartphone onClick={() => setPreviewMode('mobile')} className={`w-4 h-4 cursor-pointer ${previewMode === 'mobile' ? 'text-blue-600' : 'text-gray-400'}`} />
+        </div>
+      </div>
+      <textarea 
+        className="w-full h-48 p-4 border rounded-b-lg font-mono text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+        placeholder="Write your email content here..."
+        value={campaignData.content}
+        onChange={e => setCampaignData({...campaignData, content: e.target.value})}
+      />
+    </div>
+  );
+
+  return (
+    <div className="max-w-4xl mx-auto py-10 px-6">
+      {!isOnline && (
+        <div className="mb-6 p-3 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 text-sm border border-red-200">
+          <WifiOff className="w-4 h-4" /> Connection lost. Changes may not be saved.
+        </div>
+      )}
+
+      {/* Progress Stepper */}
+      <div className="flex justify-between mb-10">
+        {STEPS.map(s => (
+          <div key={s.number} className={`flex flex-col items-center gap-2 ${step >= s.number ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${step >= s.number ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}>
+              <s.icon className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-bold uppercase tracking-wider">{s.name}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 min-h-100">
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && (
+          <div className="space-y-4">
+            <h3 className="font-medium text-lg">Select Recipients</h3>
+            <div className="grid gap-3">
+              {lists.map(list => (
+                <label key={list.id} className="flex items-center gap-3 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded text-blue-600"
+                    checked={campaignData.listIds.includes(list.id)}
+                    onChange={() => {
+                      const ids = campaignData.listIds.includes(list.id) 
+                        ? campaignData.listIds.filter(id => id !== list.id)
+                        : [...campaignData.listIds, list.id];
+                      setCampaignData({...campaignData, listIds: ids});
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-gray-900">{list.name}</div>
+                    <div className="text-xs text-gray-500">{list.activeCount} active contacts</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 4 && (
+          <div className="space-y-6">
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+              <h4 className="font-bold text-blue-900 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" /> Ready to Launch
+              </h4>
+              <p className="text-sm text-blue-700 mt-1">
+                Your campaign will reach <strong>{estimatedCount.toLocaleString()}</strong> contacts.
+              </p>
+            </div>
+            <div className="border rounded-xl p-4 space-y-2">
+              <div className="flex justify-between text-sm"><span className="text-gray-500">From:</span> <strong>{campaignData.fromName}</strong></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Subject:</span> <strong>{campaignData.subject}</strong></div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-between mt-8">
+        <button onClick={() => setStep(p => p - 1)} disabled={step === 1} className="px-6 py-2 text-gray-500 disabled:opacity-30 transition-opacity">Back</button>
+        <div className="flex gap-4">
+          <button onClick={handleSaveDraft} disabled={saving || !isOnline} className="px-6 py-2 text-gray-600 hover:text-black transition-colors">{saving ? 'Saving...' : 'Save Draft'}</button>
+          {step < 4 ? (
+            <button onClick={() => setStep(p => p + 1)} className="px-8 py-2 bg-blue-600 text-white rounded-lg font-bold shadow-md hover:bg-blue-700 transition-all">Continue</button>
           ) : (
-            <button className="bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2">
-              <Send className="w-4 h-4" />
-              <span>Launch Campaign</span>
+            <button onClick={handleSubmit} disabled={submitting || !isOnline} className="px-8 py-2 bg-green-600 text-white rounded-lg font-bold flex items-center gap-2 shadow-md hover:bg-green-700 transition-all">
+              {submitting ? <Loader className="animate-spin w-4 h-4" /> : <Send className="w-4 h-4" />}
+              Launch
             </button>
           )}
         </div>
@@ -329,3 +300,5 @@ export const CreateCampaign: React.FC = () => {
     </div>
   );
 };
+
+export default CreateCampaign;

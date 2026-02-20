@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* src/index.css */
+@import "tailwindcss/preflight";
+@tailwind utilities;
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -66,5 +70,35 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+  }
+}
+
+
+
+@layer base {
+  :root {
+    /* Light theme variables */
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f9fafb;
+    --color-text-primary: #111827;
+    --color-text-secondary: #6b7280;
+    --color-border: #e5e7eb;
+    --color-accent: #3b82f6;
+  }
+
+  .dark {
+    /* Dark theme variables */
+    --color-bg-primary: #111827;
+    --color-bg-secondary: #1f2937;
+    --color-text-primary: #f9fafb;
+    --color-text-secondary: #9ca3af;
+    --color-border: #374151;
+    --color-accent: #60a5fa;
+  }
+
+  body {
+    @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
   }
 }
