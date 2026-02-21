@@ -6,6 +6,7 @@ export interface LinkTrackingOptions {
   utmMedium?: string;
   utmCampaign?: string;
   trackClicks: boolean;
+  sendUserAgent?: boolean; // opt-in, off by default for privacy
 }
 
 export interface TrackedLink {
@@ -20,208 +21,71 @@ export class LinkRewriteManager {
   private apiEndpoint: string;
   private trackedLinks: Map<string, TrackedLink> = new Map();
   private options: LinkTrackingOptions;
+  private observers: MutationObserver[] = [];
 
   constructor(
-    apiEndpoint: string = 'https://api.emailsuite.com',
+    apiEndpoint = 'https://api.emailsuite.com',
     options?: Partial<LinkTrackingOptions>
   ) {
-    this.apiEndpoint = apiEndpoint;
-    this.options = {
-      trackClicks: true,
-      ...options
-    };
+    this.apiEndpoint = apiEndpoint.replace(/\/$/, ''); // strip trailing slash
+    this.options = { trackClicks: true, sendUserAgent: false, ...options };
   }
+
+  // --- Public API ---
 
   public rewriteLinksInHtml(html: string, campaignId?: string): string {
     if (!this.options.trackClicks) return html;
-
-    // Parse HTML and find all anchor tags
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    
-    // Fix: Cast to HTMLAnchorElement[] after converting NodeList to Array
-    const links = Array.from(doc.querySelectorAll('a[href]')) as HTMLAnchorElement[];
-
-    links.forEach((link: HTMLAnchorElement) => {
-      const originalHref = link.getAttribute('href');
-      if (originalHref && this.shouldTrackLink(originalHref)) {
-        const trackedUrl = this.createTrackedUrl(originalHref, campaignId);
-        link.setAttribute('href', trackedUrl);
-        
-        // Add tracking attributes
-        link.setAttribute('data-tracked', 'true');
-        link.setAttribute('data-link-id', this.generateLinkId(originalHref));
-      }
-    });
-
+    (Array.from(doc.querySelectorAll('a[href]')) as HTMLAnchorElement[])
+      .forEach((link) => this.rewriteLinkElement(link, campaignId));
     return doc.body.innerHTML;
   }
 
   public rewriteLinksInText(text: string, campaignId?: string): string {
     if (!this.options.trackClicks) return text;
-
-    // Simple URL regex for plain text
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    
-    return text.replace(urlRegex, (url: string) => {
-      if (this.shouldTrackLink(url)) {
-        return this.createTrackedUrl(url, campaignId);
-      }
-      return url;
-    });
+    return text.replace(/(https?:\/\/[^\s]+)/g, (url) =>
+      this.shouldTrackLink(url) ? this.createTrackedUrl(url, campaignId) : url
+    );
   }
 
   public async rewriteLinksInGmailCompose(composeElement: HTMLElement, campaignId?: string): Promise<void> {
     if (!this.options.trackClicks) return;
 
-    // Find the editable body in Gmail compose
-    const bodyElement = composeElement.querySelector('div[role="textbox"][aria-label*="Message Body"], div[contenteditable="true"]');
-    
-    if (bodyElement) {
-      // Get the HTML content
-      const html = bodyElement.innerHTML;
-      
-      // Rewrite links
-      const rewrittenHtml = this.rewriteLinksInHtml(html, campaignId);
-      
-      // Update the content if changed
-      if (rewrittenHtml !== html) {
-        bodyElement.innerHTML = rewrittenHtml;
-      }
+    const bodyElement = composeElement.querySelector<HTMLElement>(
+      'div[role="textbox"][aria-label*="Message Body"], div[contenteditable="true"]'
+    );
+    if (!bodyElement) return;
 
-      // Also handle any links that might be added dynamically
-      this.observeNewLinks(bodyElement, campaignId);
-    }
-  }
+    const html = bodyElement.innerHTML;
+    const rewritten = this.rewriteLinksInHtml(html, campaignId);
+    if (rewritten !== html) bodyElement.innerHTML = rewritten;
 
-  private observeNewLinks(container: Element, campaignId?: string): void {
-    const observer = new MutationObserver((mutations: MutationRecord[]) => {
-      mutations.forEach((mutation: MutationRecord) => {
-        if (mutation.type === 'childList') {
-          mutation.addedNodes.forEach((node: Node) => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as Element;
-              // Check if the added node is a link or contains links
-              if (element.tagName === 'A') {
-                this.rewriteLinkElement(element as HTMLAnchorElement, campaignId);
-              } else {
-                const links = Array.from(element.querySelectorAll('a[href]')) as HTMLAnchorElement[];
-                links.forEach((link: HTMLAnchorElement) => this.rewriteLinkElement(link, campaignId));
-              }
-            }
-          });
-        }
-      });
-    });
-
-    observer.observe(container, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  private rewriteLinkElement(link: HTMLAnchorElement, campaignId?: string): void {
-    const originalHref = link.getAttribute('href');
-    if (originalHref && this.shouldTrackLink(originalHref) && !link.hasAttribute('data-tracked')) {
-      const trackedUrl = this.createTrackedUrl(originalHref, campaignId);
-      link.setAttribute('href', trackedUrl);
-      link.setAttribute('data-tracked', 'true');
-      link.setAttribute('data-link-id', this.generateLinkId(originalHref));
-    }
-  }
-
-  private shouldTrackLink(url: string): boolean {
-    // Don't track internal links or mailto links
-    if (url.startsWith('mailto:') || 
-        url.startsWith('#') || 
-        url.startsWith('tel:') ||
-        url.startsWith('javascript:')) {
-      return false;
-    }
-
-    // Don't track links to our own domain (prevents loops)
-    if (url.includes(this.apiEndpoint)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private createTrackedUrl(originalUrl: string, campaignId?: string): string {
-    const linkId = this.generateLinkId(originalUrl);
-    
-    // Create URL object safely
-    let urlObj: URL;
-    try {
-      urlObj = new URL(originalUrl);
-    } catch {
-      // If invalid URL, encode it as a parameter
-      const encodedUrl = encodeURIComponent(originalUrl);
-      urlObj = new URL(`${this.apiEndpoint}/click?url=${encodedUrl}`);
-    }
-
-    const trackedUrl = new URL(`${this.apiEndpoint}/click`);
-
-    trackedUrl.searchParams.append('url', urlObj.toString());
-    trackedUrl.searchParams.append('linkId', linkId);
-    
-    if (campaignId) {
-      trackedUrl.searchParams.append('campaignId', campaignId);
-    }
-
-    if (this.options.utmSource) {
-      trackedUrl.searchParams.append('utm_source', this.options.utmSource);
-    }
-    if (this.options.utmMedium) {
-      trackedUrl.searchParams.append('utm_medium', this.options.utmMedium);
-    }
-    if (this.options.utmCampaign || campaignId) {
-      trackedUrl.searchParams.append('utm_campaign', this.options.utmCampaign || campaignId || '');
-    }
-
-    // Add timestamp to prevent caching
-    trackedUrl.searchParams.append('_t', Date.now().toString());
-
-    // Store link for tracking
-    this.trackedLinks.set(linkId, {
-      originalUrl,
-      trackedUrl: trackedUrl.toString(),
-      linkId,
-      campaignId,
-      clicks: 0
-    });
-
-    return trackedUrl.toString();
-  }
-
-  private generateLinkId(url: string): string {
-    return `link_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.observeNewLinks(bodyElement, campaignId);
   }
 
   public async trackClick(linkId: string): Promise<void> {
     const link = this.trackedLinks.get(linkId);
     if (!link) return;
-
     link.clicks++;
 
     try {
-      // Send click data to server
       await fetch(`${this.apiEndpoint}/api/track/click`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           linkId,
           campaignId: link.campaignId,
           originalUrl: link.originalUrl,
           timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          referrer: document.referrer
+          ...(this.options.sendUserAgent && {
+            userAgent: navigator.userAgent,
+            referrer: document.referrer
+          })
         })
       });
     } catch (error) {
-      console.error('Failed to track click:', error);
+      console.error('Email Suite: failed to track click:', error);
     }
   }
 
@@ -234,22 +98,100 @@ export class LinkRewriteManager {
   }
 
   public getCampaignStats(campaignId: string): { totalClicks: number; links: TrackedLink[] } {
-    const campaignLinks = Array.from(this.trackedLinks.values())
-      .filter(link => link.campaignId === campaignId);
-    
-    const totalClicks = campaignLinks.reduce((sum, link) => sum + link.clicks, 0);
+    const links = Array.from(this.trackedLinks.values()).filter((l) => l.campaignId === campaignId);
+    return { totalClicks: links.reduce((sum, l) => sum + l.clicks, 0), links };
+  }
 
-    return {
-      totalClicks,
-      links: campaignLinks
-    };
+  public updateOptions(options: Partial<LinkTrackingOptions>): void {
+    this.options = { ...this.options, ...options };
   }
 
   public clearStats(): void {
     this.trackedLinks.clear();
   }
 
-  public updateOptions(options: Partial<LinkTrackingOptions>): void {
-    this.options = { ...this.options, ...options };
+  /** Disconnect all MutationObservers created by this instance */
+  public destroy(): void {
+    this.observers.forEach((o) => o.disconnect());
+    this.observers = [];
+  }
+
+  // --- Private ---
+
+  private observeNewLinks(container: Element, campaignId?: string): void {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type !== 'childList') return;
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return;
+          const el = node as Element;
+          if (el.tagName === 'A') {
+            this.rewriteLinkElement(el as HTMLAnchorElement, campaignId);
+          } else {
+            (Array.from(el.querySelectorAll('a[href]')) as HTMLAnchorElement[])
+              .forEach((link) => this.rewriteLinkElement(link, campaignId));
+          }
+        });
+      });
+    });
+
+    observer.observe(container, { childList: true, subtree: true });
+    // Fixed: store observer so it can be disconnected via destroy()
+    this.observers.push(observer);
+  }
+
+  private rewriteLinkElement(link: HTMLAnchorElement, campaignId?: string): void {
+    const href = link.getAttribute('href');
+    if (!href || !this.shouldTrackLink(href) || link.hasAttribute('data-tracked')) return;
+    const trackedUrl = this.createTrackedUrl(href, campaignId);
+    link.setAttribute('href', trackedUrl);
+    link.setAttribute('data-tracked', 'true');
+    link.setAttribute('data-link-id', this.generateLinkId(href));
+  }
+
+  private shouldTrackLink(url: string): boolean {
+    if (/^(mailto:|#|tel:|javascript:)/i.test(url)) return false;
+    if (url.includes(this.apiEndpoint)) return false; // prevent redirect loops
+    return true;
+  }
+
+  private createTrackedUrl(originalUrl: string, campaignId?: string): string {
+    const linkId = this.generateLinkId(originalUrl);
+
+    // Fixed: handle invalid URLs cleanly without dead-code fallback
+    let resolvedUrl: string;
+    try {
+      resolvedUrl = new URL(originalUrl).toString();
+    } catch {
+      resolvedUrl = originalUrl; // pass as-is, server will handle/reject
+    }
+
+    const tracked = new URL(`${this.apiEndpoint}/click`);
+    tracked.searchParams.set('url', resolvedUrl);
+    tracked.searchParams.set('linkId', linkId);
+    if (campaignId)                              tracked.searchParams.set('campaignId', campaignId);
+    if (this.options.utmSource)                  tracked.searchParams.set('utm_source', this.options.utmSource);
+    if (this.options.utmMedium)                  tracked.searchParams.set('utm_medium', this.options.utmMedium);
+    if (this.options.utmCampaign || campaignId)  tracked.searchParams.set('utm_campaign', this.options.utmCampaign ?? campaignId ?? '');
+    // Fixed: no _t timestamp — same link must produce same tracked URL for deduplication
+
+    this.trackedLinks.set(linkId, {
+      originalUrl,
+      trackedUrl: tracked.toString(),
+      linkId,
+      campaignId,
+      clicks: 0
+    });
+
+    return tracked.toString();
+  }
+
+  // Fixed: stable hash based on URL content, not random — same URL = same ID
+  private generateLinkId(url: string): string {
+    let hash = 0;
+    for (let i = 0; i < url.length; i++) {
+      hash = (Math.imul(31, hash) + url.charCodeAt(i)) | 0;
+    }
+    return `link_${Math.abs(hash).toString(36)}`;
   }
 }

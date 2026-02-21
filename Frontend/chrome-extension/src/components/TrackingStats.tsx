@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 interface TrackingStatsProps {
   stats: {
@@ -8,45 +8,22 @@ interface TrackingStatsProps {
   };
 }
 
-export const TrackingStats: React.FC<TrackingStatsProps> = ({ stats }) => {
-  return (
-    <div className="tracking-stats" style={{ margin: "16px 0" }}>
-      <h3 style={{ fontSize: "14px", margin: "0 0 12px 0" }}>
-        Today's Activity
-      </h3>
-      <div
-        className="stats-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: "8px",
-        }}
-      >
-        <div className="stat-item" style={{ textAlign: "center" }}>
-          <div
-            style={{ fontSize: "20px", fontWeight: "bold", color: "#1a73e8" }}
-          >
-            {stats.emailsSent}
-          </div>
-          <div style={{ fontSize: "12px", color: "#5f6368" }}>Sent</div>
+const STAT_ITEMS = (stats: TrackingStatsProps['stats']) => [
+  { label: 'Sent',   value: stats.emailsSent,    color: 'text-blue-600'  },
+  { label: 'Opened', value: stats.emailsOpened,  color: 'text-green-600' },
+  { label: 'Clicks', value: stats.linksClicked,  color: 'text-red-500'   },
+];
+
+export const TrackingStats: React.FC<TrackingStatsProps> = ({ stats }) => (
+  <div className="my-4">
+    <h3 className="text-sm font-medium text-gray-800 mb-3">Today's Activity</h3>
+    <div className="grid grid-cols-3 gap-2">
+      {STAT_ITEMS(stats).map(({ label, value, color }) => (
+        <div key={label} className="text-center">
+          <div className={`text-xl font-bold ${color}`}>{value}</div>
+          <div className="text-xs text-gray-500">{label}</div>
         </div>
-        <div className="stat-item" style={{ textAlign: "center" }}>
-          <div
-            style={{ fontSize: "20px", fontWeight: "bold", color: "#34a853" }}
-          >
-            {stats.emailsOpened}
-          </div>
-          <div style={{ fontSize: "12px", color: "#5f6368" }}>Opened</div>
-        </div>
-        <div className="stat-item" style={{ textAlign: "center" }}>
-          <div
-            style={{ fontSize: "20px", fontWeight: "bold", color: "#ea4335" }}
-          >
-            {stats.linksClicked}
-          </div>
-          <div style={{ fontSize: "12px", color: "#5f6368" }}>Clicks</div>
-        </div>
-      </div>
+      ))}
     </div>
-  );
-};
+  </div>
+);

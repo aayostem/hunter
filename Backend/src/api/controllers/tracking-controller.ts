@@ -1,90 +1,79 @@
-import { Request, Response } from "express";
-import { TrackingService } from "../../services/tracking-service";
+import { Request, Response } from 'express';
+import { TrackingService } from '../../services/tracking-service';
+
+const TRACKING_PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64'
+);
 
 export class TrackingController {
-  private trackingService: TrackingService;
+  private svc: TrackingService;
 
   constructor() {
-    this.trackingService = new TrackingService();
+    this.svc = new TrackingService();
   }
+
+  // --- Helpers ---
+
+  private meta = (req: Request) => ({
+    ipAddress: req.ip ?? 'unknown',
+    userAgent: req.get('User-Agent') ?? 'unknown',
+    timestamp: new Date()
+  });
+
+  private tid(req: Request, res: Response): string | null {
+    const id = req.params.trackingId;
+    if (!id) { res.status(400).json({ error: 'Tracking ID is required' }); return null; }
+    return id;
+  }
+
+  // --- Handlers ---
 
   serveTrackingPixel = async (req: Request, res: Response) => {
     try {
-      const { trackingId } = req.params;
-
-      // Track the email open
-      await this.trackingService.recordEmailOpen(trackingId, {
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-        timestamp: new Date(),
-      });
-
-      // Serve 1x1 transparent PNG
-      const pixel = Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-        "base64"
-      );
-
-      res.setHeader("Content-Type", "image/png");
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.send(pixel);
-    } catch (error) {
-      console.error("Error serving tracking pixel:", error);
+      const id = this.tid(req, res); if (!id) return;
+      await this.svc.recordEmailOpen(id, this.meta(req));
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.send(TRACKING_PIXEL);
+    } catch (e) {
+      console.error('Error serving tracking pixel:', e);
       res.status(500).send();
     }
   };
 
   trackLinkClick = async (req: Request, res: Response) => {
+    const fallback = typeof req.query.url === 'string' ? req.query.url : '/';
     try {
-      const { trackingId } = req.params;
+      const id = this.tid(req, res); if (!id) return;
       const { url } = req.query;
-
-      if (!url || typeof url !== "string") {
-        return res.status(400).json({ error: "URL parameter required" });
-      }
-
-      // Record the click
-      await this.trackingService.recordLinkClick(trackingId, url, {
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-        timestamp: new Date(),
-      });
-
-      // Redirect to original URL
+      if (!url || typeof url !== 'string') return void res.status(400).json({ error: 'URL parameter required' });
+      await this.svc.recordLinkClick(id, url, this.meta(req));
       res.redirect(302, url);
-    } catch (error) {
-      console.error("Error tracking link click:", error);
-      res.redirect(
-        302,
-        typeof req.query.url === "string" ? req.query.url : "/"
-      );
+    } catch (e) {
+      console.error('Error tracking link click:', e);
+      res.redirect(302, fallback);
     }
   };
 
   trackEmailOpen = async (req: Request, res: Response) => {
     try {
-      const { trackingId } = req.params;
-      await this.trackingService.recordEmailOpen(trackingId, {
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-        timestamp: new Date(),
-      });
-
+      const id = this.tid(req, res); if (!id) return;
+      await this.svc.recordEmailOpen(id, this.meta(req));
       res.json({ success: true });
-    } catch (error) {
-      console.error("Error tracking email open:", error);
-      res.status(500).json({ error: "Tracking failed" });
+    } catch (e) {
+      console.error('Error tracking email open:', e);
+      res.status(500).json({ error: 'Tracking failed' });
     }
   };
 
   getTrackingAnalytics = async (req: Request, res: Response) => {
     try {
-      const { trackingId } = req.params;
-      const analytics = await this.trackingService.getAnalytics(trackingId);
-      res.json(analytics);
-    } catch (error) {
-      console.error("Error getting analytics:", error);
-      res.status(500).json({ error: "Failed to get analytics" });
+      const id = this.tid(req, res); if (!id) return;
+      res.json(await this.svc.getAnalytics(id));
+    } catch (e) {
+      console.error('Error getting analytics:', e);
+      res.status(500).json({ error: 'Failed to get analytics' });
     }
   };
 }

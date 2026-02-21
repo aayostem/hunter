@@ -1,9 +1,9 @@
 // src/utils/tracking-pixel-injector.ts
 
 export interface TrackingPixelOptions {
-  pixelUrl: string;
+  pixelUrl?: string;
   pixelSize?: '1x1' | 'hidden';
-  position?: 'top' | 'bottom' | 'random';
+  position?: 'top' | 'bottom';
   campaignId?: string;
   emailId?: string;
   recipientEmail?: string;
@@ -13,7 +13,7 @@ export interface TrackingData {
   pixelId: string;
   emailId: string;
   campaignId?: string;
-  openedAt?: Date;
+  openedAt: Date;
   ipAddress?: string;
   userAgent?: string;
   location?: string;
@@ -25,161 +25,55 @@ export interface TrackingData {
 
 export class TrackingPixelInjector {
   private apiEndpoint: string;
-  private defaultOptions: TrackingPixelOptions;
+  private defaultOptions: Required<Pick<TrackingPixelOptions, 'pixelSize' | 'position'>> & TrackingPixelOptions;
   private trackedEmails: Map<string, TrackingData> = new Map();
 
   constructor(
-    apiEndpoint: string = 'https://api.emailsuite.com',
+    apiEndpoint = 'https://api.emailsuite.com',
     defaultOptions?: Partial<TrackingPixelOptions>
   ) {
-    this.apiEndpoint = apiEndpoint;
+    this.apiEndpoint = apiEndpoint.replace(/\/$/, '');
     this.defaultOptions = {
-      pixelUrl: `${apiEndpoint}/track/open`,
       pixelSize: '1x1',
       position: 'bottom',
+      pixelUrl: `${this.apiEndpoint}/track/open`,
       ...defaultOptions
     };
+  }
+
+  // --- Public API ---
+
+  public injectPixelIntoHtml(
+    html: string,
+    options?: Partial<TrackingPixelOptions>
+  ): { html: string; pixelId: string } {
+    const opts = { ...this.defaultOptions, ...options };
+    const pixelId = this.generatePixelId();
+    const pixelHtml = this.buildPixelHtml(pixelId, opts);
+
+    // Fixed: only insert at safe positions — not random offset which can split tags
+    const finalHtml = html.includes('</body>')
+      ? html.replace('</body>', `${pixelHtml}</body>`)
+      : opts.position === 'top'
+        ? pixelHtml + html
+        : html + pixelHtml;
+
+    return { html: finalHtml, pixelId };
   }
 
   public injectPixel(
     emailContent: string,
     options?: Partial<TrackingPixelOptions>
   ): { content: string; pixelId: string } {
-    const pixelOptions = { ...this.defaultOptions, ...options };
+    const opts = { ...this.defaultOptions, ...options };
     const pixelId = this.generatePixelId();
-    const pixelHtml = this.generatePixelHtml(pixelOptions, pixelId);
+    const pixelHtml = this.buildPixelHtml(pixelId, opts);
 
-    // Inject pixel at specified position
-    let finalContent = emailContent;
-    switch (pixelOptions.position) {
-      case 'top':
-        finalContent = pixelHtml + emailContent;
-        break;
-      case 'bottom':
-        finalContent = emailContent + pixelHtml;
-        break;
-      case 'random':
-        const insertPos = Math.floor(Math.random() * emailContent.length);
-        finalContent = emailContent.slice(0, insertPos) + 
-                      pixelHtml + 
-                      emailContent.slice(insertPos);
-        break;
-    }
+    const finalContent = opts.position === 'top'
+      ? pixelHtml + emailContent
+      : emailContent + pixelHtml;
 
-    return {
-      content: finalContent,
-      pixelId
-    };
-  }
-
-  public injectPixelIntoHtml(
-    html: string,
-    options?: Partial<TrackingPixelOptions>
-  ): { html: string; pixelId: string } {
-    const pixelOptions = { ...this.defaultOptions, ...options };
-    const pixelId = this.generatePixelId();
-    
-    // Generate tracking pixel as img tag
-    const pixelUrl = new URL(pixelOptions.pixelUrl);
-    pixelUrl.searchParams.append('pixelId', pixelId);
-    
-    if (pixelOptions.campaignId) {
-      pixelUrl.searchParams.append('campaignId', pixelOptions.campaignId);
-    }
-    if (pixelOptions.emailId) {
-      pixelUrl.searchParams.append('emailId', pixelOptions.emailId);
-    }
-    if (pixelOptions.recipientEmail) {
-      pixelUrl.searchParams.append('recipient', btoa(pixelOptions.recipientEmail));
-    }
-
-    const pixelHtml = `<img src="${pixelUrl.toString()}" 
-      width="1" 
-      height="1" 
-      style="display:none;width:1px;height:1px;border:0;"
-      alt="" 
-      aria-hidden="true"
-    />`;
-
-    // Insert before closing body tag or at the end
-    let finalHtml = html;
-    if (html.includes('</body>')) {
-      finalHtml = html.replace('</body>', `${pixelHtml}</body>`);
-    } else {
-      finalHtml = html + pixelHtml;
-    }
-
-    return {
-      html: finalHtml,
-      pixelId
-    };
-  }
-
-  private generatePixelHtml(options: TrackingPixelOptions, pixelId: string): string {
-    const pixelUrl = new URL(options.pixelUrl);
-    pixelUrl.searchParams.append('pixelId', pixelId);
-    
-    if (options.campaignId) {
-      pixelUrl.searchParams.append('campaignId', options.campaignId);
-    }
-    if (options.emailId) {
-      pixelUrl.searchParams.append('emailId', options.emailId);
-    }
-
-    if (options.pixelSize === '1x1') {
-      return `<img src="${pixelUrl.toString()}" width="1" height="1" style="display:none;" />`;
-    } else {
-      // Hidden pixel
-      return `<img src="${pixelUrl.toString()}" style="display:none;width:0;height:0;border:0;" />`;
-    }
-  }
-
-  private generatePixelId(): string {
-    return `pixel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  public async handlePixelRequest(pixelId: string, requestData: any): Promise<void> {
-    // This would typically run on your server
-    const trackingData: TrackingData = {
-      pixelId,
-      emailId: requestData.emailId || 'unknown',
-      campaignId: requestData.campaignId,
-      openedAt: new Date(),
-      ipAddress: requestData.ip,
-      userAgent: requestData.userAgent,
-      location: requestData.location,
-      device: this.detectDevice(requestData.userAgent),
-      opens: 1,
-      firstOpen: new Date(),
-      lastOpen: new Date()
-    };
-
-    // Store tracking data
-    this.trackedEmails.set(pixelId, trackingData);
-
-    // Send to analytics
-    await this.sendTrackingData(trackingData);
-  }
-
-  private detectDevice(userAgent: string): 'desktop' | 'mobile' | 'tablet' {
-    const ua = userAgent.toLowerCase();
-    if (ua.includes('mobile')) return 'mobile';
-    if (ua.includes('tablet')) return 'tablet';
-    return 'desktop';
-  }
-
-  private async sendTrackingData(data: TrackingData): Promise<void> {
-    try {
-      await fetch(`${this.apiEndpoint}/api/track/open`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-    } catch (error) {
-      console.error('Failed to send tracking data:', error);
-    }
+    return { content: finalContent, pixelId };
   }
 
   public getTrackingData(pixelId: string): TrackingData | undefined {
@@ -190,39 +84,117 @@ export class TrackingPixelInjector {
     return Array.from(this.trackedEmails.values());
   }
 
-  public getOpenRate(campaignId: string): { sent: number; opened: number; rate: number } {
-    const campaignPixels = Array.from(this.trackedEmails.values())
-      .filter(data => data.campaignId === campaignId);
-
-    const uniqueOpens = new Set(campaignPixels.map(p => p.emailId)).size;
-    
+  /**
+   * NOTE: `sent` must be passed in — this class only tracks opens,
+   * not how many emails were sent. Open rate cannot be derived from opens alone.
+   */
+  public getOpenRate(campaignId: string, sent: number): { sent: number; opened: number; rate: number } {
+    const pixels = Array.from(this.trackedEmails.values()).filter((d) => d.campaignId === campaignId);
+    const opened = new Set(pixels.map((p) => p.emailId)).size;
     return {
-      sent: campaignPixels.length,
-      opened: uniqueOpens,
-      rate: campaignPixels.length > 0 ? (uniqueOpens / campaignPixels.length) * 100 : 0
+      sent,
+      opened,
+      rate: sent > 0 ? (opened / sent) * 100 : 0
     };
   }
 
-  public generateTrackingReport(campaignId: string): string {
-    const data = this.getOpenRate(campaignId);
-    const pixels = Array.from(this.trackedEmails.values())
-      .filter(p => p.campaignId === campaignId);
+  public generateTrackingReport(campaignId: string, sent: number): string {
+    const { opened, rate } = this.getOpenRate(campaignId, sent);
+    const pixels = Array.from(this.trackedEmails.values()).filter((p) => p.campaignId === campaignId);
 
-    const opensByDevice = pixels.reduce((acc, p) => {
-      acc[p.device || 'unknown'] = (acc[p.device || 'unknown'] || 0) + 1;
+    const byDevice = pixels.reduce((acc, p) => {
+      const key = p.device ?? 'unknown';
+      acc[key] = (acc[key] ?? 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    return `
-      Campaign: ${campaignId}
-      Sent: ${data.sent}
-      Opens: ${data.opened}
-      Open Rate: ${data.rate.toFixed(2)}%
-      
-      Opens by Device:
-      ${Object.entries(opensByDevice)
-        .map(([device, count]) => `  ${device}: ${count}`)
-        .join('\n')}
-    `;
+    const deviceLines = Object.entries(byDevice)
+      .map(([device, count]) => `  ${device}: ${count}`)
+      .join('\n');
+
+    return [
+      `Campaign:   ${campaignId}`,
+      `Sent:       ${sent}`,
+      `Opens:      ${opened}`,
+      `Open Rate:  ${rate.toFixed(2)}%`,
+      ``,
+      `Opens by Device:`,
+      deviceLines
+    ].join('\n');
+  }
+
+  // --- Private ---
+
+  // Fixed: single URL-building method used by all injection paths
+  private buildPixelUrl(pixelId: string, options: Partial<TrackingPixelOptions>): string {
+    const base = options.pixelUrl ?? this.defaultOptions.pixelUrl ?? `${this.apiEndpoint}/track/open`;
+    const url = new URL(base);
+    url.searchParams.set('pixelId', pixelId);
+    if (options.campaignId)    url.searchParams.set('campaignId', options.campaignId);
+    if (options.emailId)       url.searchParams.set('emailId', options.emailId);
+    // Fixed: btoa fails on non-ASCII — use encodeURIComponent instead
+    if (options.recipientEmail) url.searchParams.set('recipient', encodeURIComponent(options.recipientEmail));
+    return url.toString();
+  }
+
+  private buildPixelHtml(pixelId: string, options: Partial<TrackingPixelOptions>): string {
+    const src = this.buildPixelUrl(pixelId, options);
+    const size = options.pixelSize ?? '1x1';
+    const style = size === '1x1'
+      ? 'display:none;width:1px;height:1px;border:0;'
+      : 'display:none;width:0;height:0;border:0;';
+    return `<img src="${src}" width="1" height="1" style="${style}" alt="" aria-hidden="true" />`;
+  }
+
+  // Pixel IDs are per-send so uniqueness matters more than stability — crypto random is appropriate
+  private generatePixelId(): string {
+    const rand = crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    return `pixel_${rand}`;
+  }
+
+  public detectDevice(userAgent: string): 'desktop' | 'mobile' | 'tablet' {
+    const ua = userAgent.toLowerCase();
+    if (ua.includes('tablet') || (ua.includes('ipad'))) return 'tablet';
+    if (ua.includes('mobile') || ua.includes('iphone') || ua.includes('android')) return 'mobile';
+    return 'desktop';
+  }
+
+  /**
+   * Server-side only — call this from your tracking route handler, not from the browser.
+   * Kept here as a utility but should be moved to a dedicated server service.
+   */
+  public recordOpen(pixelId: string, requestData: {
+    emailId?: string;
+    campaignId?: string;
+    ip?: string;
+    userAgent?: string;
+    location?: string;
+  }): TrackingData {
+    const existing = this.trackedEmails.get(pixelId);
+    const now = new Date();
+
+    if (existing) {
+      existing.opens++;
+      existing.lastOpen = now;
+      existing.openedAt = now;
+      return existing;
+    }
+
+    const data: TrackingData = {
+      pixelId,
+      emailId: requestData.emailId ?? 'unknown',
+      campaignId: requestData.campaignId,
+      openedAt: now,
+      ipAddress: requestData.ip,
+      userAgent: requestData.userAgent,
+      location: requestData.location,
+      device: requestData.userAgent ? this.detectDevice(requestData.userAgent) : undefined,
+      opens: 1,
+      firstOpen: now,
+      lastOpen: now
+    };
+
+    this.trackedEmails.set(pixelId, data);
+    return data;
   }
 }

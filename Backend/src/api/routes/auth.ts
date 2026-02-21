@@ -1,57 +1,24 @@
-import express from "express";
-import { AuthService } from "../../services/auth-service";
-import { authenticate } from "../../middleware/auth";
+import express from 'express';
+import { AuthController } from '../controllers/auth-controller';
+import { authenticate } from '../middleware/auth';
 
 export const authRoutes = express.Router();
-const authService = new AuthService();
+const auth = new AuthController();
 
-authRoutes.post("/register", async (req, res) => {
-  try {
-    const result = await authService.register(req.body);
-    res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
-  }
-});
+// --- Public ---
+authRoutes.post('/register',      auth.register);
+authRoutes.post('/login',         auth.login);
+authRoutes.post('/refresh',       auth.refresh);
+authRoutes.post('/verify-email',  auth.verifyEmail);
+authRoutes.post('/forgot-password', auth.forgotPassword);
+authRoutes.post('/reset-password',  auth.resetPassword);
 
-authRoutes.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const result = await authService.login(email, password);
-    res.json(result);
-  } catch (error: any) {
-    res.status(401).json({ error: error.message });
-  }
-});
+// --- MFA ---
+authRoutes.post('/mfa/verify',    auth.verifyMFA);
+authRoutes.post('/mfa/setup',     authenticate, auth.setupMFA);
+authRoutes.post('/mfa/disable',   authenticate, auth.disableMFA);
 
-authRoutes.post("/refresh", async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    const tokens = await authService.refreshToken(refreshToken);
-    res.json(tokens);
-  } catch (error: any) {
-    res.status(401).json({ error: error.message });
-  }
-});
-
-authRoutes.post("/logout", authenticate, async (req, res) => {
-  try {
-    const user = (req as any).user;
-    const { refreshToken } = req.body;
-    await authService.logout(user.id, refreshToken);
-    res.json({ message: "Logged out successfully" });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-authRoutes.post("/change-password", authenticate, async (req, res) => {
-  try {
-    const user = (req as any).user;
-    const { currentPassword, newPassword } = req.body;
-    await authService.changePassword(user.id, currentPassword, newPassword);
-    res.json({ message: "Password changed successfully" });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
-  }
-});
+// --- Authenticated ---
+authRoutes.post('/logout',          authenticate, auth.logout);
+authRoutes.post('/change-password', authenticate, auth.changePassword);
+authRoutes.get('/me',               authenticate, auth.me);

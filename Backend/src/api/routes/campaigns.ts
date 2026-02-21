@@ -1,37 +1,37 @@
 import express from 'express';
 import { CampaignController } from '../controllers/campaign-controller';
-import { authenticate, requirePlan } from '../../middleware/auth';
-import { campaignRateLimiter } from '../../middleware/rate-limit';
+import { authenticate, requirePlan } from '../middleware/auth'
+import { campaignRateLimiter } from '../middleware/ratelimiter';
 
-export const campaignRoutes = express.Router();  // This was missing!
-const campaignController = new CampaignController();
+export const campaignRoutes = express.Router();
+const cc = new CampaignController();
+const pro = requirePlan(['PRO']);
 
-// Apply authentication and rate limiting to all campaign routes
+// Global middleware
 campaignRoutes.use(authenticate);
 campaignRoutes.use(campaignRateLimiter);
 
-// Campaign CRUD operations
-campaignRoutes.post('/', requirePlan('PRO'), campaignController.createCampaign);
-campaignRoutes.get('/', requirePlan('PRO'), campaignController.getCampaigns);
-campaignRoutes.get('/:id', requirePlan('PRO'), campaignController.getCampaign);
-campaignRoutes.put('/:id', requirePlan('PRO'), campaignController.updateCampaign);
-campaignRoutes.delete('/:id', requirePlan('PRO'), campaignController.deleteCampaign);
+// Templates MUST come before /:id to avoid route shadowing
+campaignRoutes.post('/templates',      pro, cc.createTemplate);
+campaignRoutes.get('/templates',       pro, cc.getTemplates);
+campaignRoutes.put('/templates/:id',   pro, cc.updateTemplate);
+campaignRoutes.delete('/templates/:id',pro, cc.deleteTemplate);
+
+// Campaign CRUD
+campaignRoutes.post('/',               pro, cc.createCampaign);
+campaignRoutes.get('/',                pro, cc.getCampaigns);
+campaignRoutes.get('/:id',             pro, cc.getCampaign);
+campaignRoutes.put('/:id',             pro, cc.updateCampaign);
+campaignRoutes.delete('/:id',          pro, cc.deleteCampaign);
 
 // Campaign actions
-campaignRoutes.post('/:id/schedule', requirePlan('PRO'), campaignController.scheduleCampaign);
-campaignRoutes.post('/:id/send', requirePlan('PRO'), campaignController.sendCampaign);
-campaignRoutes.post('/:id/pause', requirePlan('PRO'), campaignController.pauseCampaign);
-campaignRoutes.post('/:id/resume', requirePlan('PRO'), campaignController.resumeCampaign);
+campaignRoutes.post('/:id/schedule',   pro, cc.scheduleCampaign);
+campaignRoutes.post('/:id/send',       pro, cc.sendCampaign);
+campaignRoutes.post('/:id/pause',      pro, cc.pauseCampaign);
+campaignRoutes.post('/:id/resume',     pro, cc.resumeCampaign);
 
-// Campaign analytics
-campaignRoutes.get('/:id/analytics', requirePlan('PRO'), campaignController.getCampaignAnalytics);
-campaignRoutes.get('/:id/recipients', requirePlan('PRO'), campaignController.getCampaignRecipients);
+// Analytics
+campaignRoutes.get('/:id/analytics',   pro, cc.getCampaignAnalytics);
+campaignRoutes.get('/:id/recipients',  pro, cc.getCampaignRecipients);
 
-// Campaign templates
-campaignRoutes.post('/templates', requirePlan('PRO'), campaignController.createTemplate);
-campaignRoutes.get('/templates', requirePlan('PRO'), campaignController.getTemplates);
-campaignRoutes.put('/templates/:id', requirePlan('PRO'), campaignController.updateTemplate);
-campaignRoutes.delete('/templates/:id', requirePlan('PRO'), campaignController.deleteTemplate);
-
-// Export for use in index.ts
 export default campaignRoutes;

@@ -267,7 +267,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Logo/Brand */}
-            <div className="flex-shrink-0 flex items-center ml-4 lg:ml-0">
+            <div className="shrink-0 flex items-center ml-4 lg:ml-0">
               <Mail className="h-8 w-8 text-blue-600" />
               <span className="ml-2 text-xl font-bold text-gray-900">EmailSuite</span>
             </div>

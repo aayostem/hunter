@@ -361,3 +361,28 @@ function fallbackTimeFormatter(
   
   return `${hours.toString().padStart(2, '0')}:${minutes}${seconds}`;
 }
+
+/**
+ * Formats large numbers into a compact version (e.g., 1500 -> 1.5K)
+ * @param value - The number to format
+ * @returns Formatted string
+ */
+export const formatCompactNumber = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+};
+
+/**
+ * Formats a decimal/ratio into a percentage string (e.g., 0.15 -> 15%)
+ * @param value - The number to format
+ * @returns Formatted percentage string
+ */
+export const formatPercentage = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value / 100); // Divided by 100 if your backend sends whole numbers (e.g., 15 for 15%)
+};

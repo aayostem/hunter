@@ -1,5 +1,3 @@
-
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,155 +7,277 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Your models remain the same...
 model User {
-    id            String   @id @default(cuid())
-    email         String   @unique
-    name          String?
-    plan          Plan     @default(FREE)
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
-    lastLoginAt   DateTime?
-    avatar        String?
-    emailVerified Boolean  @default(false)
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String?
+  password           String
+  plan               Plan      @default(FREE)
+  
+  // Auth fields
+  emailVerified      Boolean   @default(false)
+  verificationToken  String?   @unique
+  verificationExpires DateTime?
+  resetPasswordToken String?   @unique
+  resetPasswordExpires DateTime?
+  passwordResetToken    String?   @unique
+  passwordResetExpires  DateTime?
+  
+  // MFA fields
+  mfaEnabled         Boolean   @default(false)
+  mfaSecret          String?
+  mfaBackupCodes     Json?
+  
+  // Security fields
+  loginCount         Int       @default(0)
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  lastLoginUserAgent String?
+  lockedUntil        DateTime?
+  failedLoginAttempts Int      @default(0)
+  
+  // Profile fields
+  avatar             String?
+  company            String?
+  timezone           String?   @default("UTC")
+  locale             String?   @default("en-US")
+  
+  // Timestamps
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  // Relations
+  sessions           Session[]
+  apiKeys            ApiKey[]
+  trackedEmails      TrackedEmail[]
+  campaigns          Campaign[]
+  subscriptions      Subscription[]
+  aiInsights         AIInsight[]
+  campaignTemplates  CampaignTemplate[]
+  auditLogs          AuditLog[]
+  webhooks           Webhook[]
+  notificationSettings NotificationSettings?
 
-    trackedEmails  TrackedEmail[]
-    campaigns      Campaign[]
-    subscriptions  Subscription[]
-    aiInsights     AIInsight[]
-    campaignTemplates CampaignTemplate[]
-
-    @@map("users")
+  @@map("users")
 }
 
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  refreshToken String?  @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceInfo   Json?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  key         String   @unique
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  permissions Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([key])
+  @@map("api_keys")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entityType  String?
+  entityId    String?
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model NotificationSettings {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  emailNotifications   Boolean  @default(true)
+  marketingEmails      Boolean  @default(true)
+  securityAlerts       Boolean  @default(true)
+  campaignUpdates      Boolean  @default(true)
+  weeklyReports        Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  userId      String
+  url         String
+  events      Json
+  secret      String
+  isActive    Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  failureCount Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("webhooks")
+}
+
+// Keep your existing models below...
 model TrackedEmail {
-    id          String    @id @default(cuid())
-    trackingId  String    @unique
-    userId      String
-    recipient   String
-    subject     String?
-    messageId   String?
-    // Add this field
-    campaignId  String?
-    createdAt   DateTime  @default(now())
+  id          String    @id @default(cuid())
+  trackingId  String    @unique
+  userId      String
+  recipient   String
+  subject     String?
+  messageId   String?
+  campaignId  String?
+  createdAt   DateTime  @default(now())
 
-    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-    // Add this optional relation
-    campaign    Campaign? @relation(fields: [campaignId], references: [id])
-    opens       EmailOpen[]
-    clicks      LinkClick[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  opens       EmailOpen[]
+  clicks      LinkClick[]
 
-    @@index([userId])
-    @@index([createdAt])
-    @@index([trackingId])
-    @@index([campaignId]) // Add index
-    @@map("tracked_emails")
-
-    // Relations
-    // user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([createdAt])
+  @@index([trackingId])
+  @@index([campaignId])
+  @@map("tracked_emails")
 }
 
 model EmailOpen {
-    id             String   @id @default(cuid())
-    trackedEmailId String
-    ipAddress      String?
-    userAgent      String?
-    location       String?
-    deviceType     String?
-    timestamp      DateTime @default(now())
+  id              String   @id @default(cuid())
+  trackedEmailId  String
+  ipAddress       String?
+  userAgent       String?
+  location        String?
+  deviceType      String?
+  timestamp       DateTime @default(now())
 
-    trackedEmail TrackedEmail @relation(fields: [trackedEmailId], references: [id], onDelete: Cascade)
+  trackedEmail TrackedEmail @relation(fields: [trackedEmailId], references: [id], onDelete: Cascade)
 }
 
 model LinkClick {
-    id             String   @id @default(cuid())
-    trackedEmailId String
-    url            String
-    ipAddress      String?
-    userAgent      String?
-    timestamp      DateTime @default(now())
+  id              String   @id @default(cuid())
+  trackedEmailId  String
+  url             String
+  ipAddress       String?
+  userAgent       String?
+  timestamp       DateTime @default(now())
 
-    trackedEmail TrackedEmail @relation(fields: [trackedEmailId], references: [id], onDelete: Cascade)
+  trackedEmail TrackedEmail @relation(fields: [trackedEmailId], references: [id], onDelete: Cascade)
 }
 
 model Campaign {
-    id          String         @id @default(cuid())
-    userId      String
-    name        String
-    subject     String         
-    body        String         
-    recipientList Json         
-    status      CampaignStatus @default(DRAFT)
-    scheduledAt DateTime?
-    createdAt   DateTime       @default(now())
-    trackedEmails TrackedEmail[]
+  id           String         @id @default(cuid())
+  userId       String
+  name         String
+  subject      String         
+  body         String         
+  recipientList Json         
+  status       CampaignStatus @default(DRAFT)
+  scheduledAt  DateTime?
+  createdAt    DateTime       @default(now())
+  trackedEmails TrackedEmail[]
 
-    
-    @@index([userId])
-    @@index([status])
-    @@map("campaigns")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([status])
+  @@map("campaigns")
 }
 
 model Subscription {
-    id                   String   @id @default(cuid())
-    userId               String
-    stripeSubscriptionId String   @unique
-    stripeCustomerId     String
-    plan                 Plan
-    status               String
-    currentPeriodStart   DateTime
-    currentPeriodEnd     DateTime
-    cancelAtPeriodEnd    Boolean  @default(false)
-    createdAt            DateTime @default(now())
-    updatedAt            DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  userId               String
+  stripeSubscriptionId String   @unique
+  stripeCustomerId     String
+  plan                 Plan
+  status               String
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([userId])
+  @@index([userId])
 }
 
 model AIInsight {
-    id          String   @id @default(cuid())
-    userId      String
-    type        String // 'performance', 'engagement', 'recommendation'
-    data        Json
-    generatedAt DateTime @default(now())
-    expiresAt   DateTime?
+  id          String   @id @default(cuid())
+  userId      String
+  type        String // 'performance', 'engagement', 'recommendation'
+  data        Json
+  generatedAt DateTime @default(now())
+  expiresAt   DateTime?
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([userId, type])
+  @@index([userId, type])
 }
+
 model CampaignTemplate {
-    id        String   @id @default(cuid())
-    userId    String
-    name      String
-    subject   String
-    body      String
-    category  String   @default("general")
-    variables Json     // For storing template variables
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    
-    @@index([userId])
-    @@map("campaign_templates")
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  subject   String
+  body      String
+  category  String   @default("general")
+  variables Json     // For storing template variables
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@map("campaign_templates")
 }
 
 enum Plan {
-    FREE
-    PRO
-    BUSINESS
-    ENTERPRISE
+  FREE
+  PRO
+  BUSINESS
+  ENTERPRISE
 }
 
 enum CampaignStatus {
-    DRAFT
-    SCHEDULED
-    SENDING
-    COMPLETED
-    FAILED
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  FAILED
 }
