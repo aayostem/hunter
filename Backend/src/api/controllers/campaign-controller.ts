@@ -83,19 +83,24 @@ export class CampaignController {
       this.fail(res, e);
     }
   };
-  scheduleCampaign = async (req: Request, res: Response) => {
-    try {
-      const id = this.pid(req, res);
-      if (!id) return;
-      const { scheduleAt } = req.body;
-      if (!scheduleAt)
-        return this.fail(res, { message: "Schedule date is required" });
-      this.ok(res, await this.svc.scheduleCampaign(id, new Date(scheduleAt)));
-    } catch (e) {
-      this.fail(res, e);
-    }
-  };
+scheduleCampaign = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const id = this.pid(req, res);
+    // If id is null, we just return to stop; this returns undefined/void
+    if (!id) return; 
 
+    const { scheduleAt } = req.body;
+    if (!scheduleAt) {
+      // Returning this.fail returns the Response object
+      return this.fail(res, { message: "Schedule date is required" });
+    }
+
+    const result = await this.svc.scheduleCampaign(id, new Date(scheduleAt));
+    return this.ok(res, result); 
+  } catch (e) {
+    return this.fail(res, e);
+  }
+};
   sendCampaign = async (req: Request, res: Response) => {
     try {
       const id = this.pid(req, res);

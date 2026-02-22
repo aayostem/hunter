@@ -2,6 +2,12 @@ import { PrismaClient } from "@prisma/client";
 import { Redis } from "ioredis";
 import { config } from "../config";
 
+const suggestions: {
+  area: string;
+  suggestion: string;
+  impact: string;
+  effort: string;
+}[] = [];
 // Mock AI service - in production, integrate with OpenAI, Google AI, etc.
 export class AIInsightsService {
   private prisma: PrismaClient;
@@ -9,8 +15,8 @@ export class AIInsightsService {
 
   constructor() {
     this.prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-})
+      datasourceUrl: process.env.DATABASE_URL,
+    });
     this.redis = new Redis(config.redis.url);
   }
 
@@ -197,40 +203,62 @@ export class AIInsightsService {
       }))
       .sort((a, b) => b.engagementScore - a.engagementScore);
   }
+private async generateImprovementSuggestions(emails: any[]) {
+  const issues = this.identifyCommonIssues(emails);
+  const suggestions: { area: string; suggestion: string; impact: string; effort: string }[] = [];
 
-  private async generateImprovementSuggestions(emails: any[]) {
-    const issues = this.identifyCommonIssues(emails);
-    const suggestions = [];
-
-    if (issues.lowOpenRate) {
-      suggestions.push({
-        area: "Subject Lines",
-        suggestion: "Try more personalized and action-oriented subject lines",
-        impact: "high",
-        effort: "low",
-      });
-    }
-
-    if (issues.lowClickRate) {
-      suggestions.push({
-        area: "Call-to-Action",
-        suggestion: "Include clearer and more prominent CTAs in your emails",
-        impact: "medium",
-        effort: "low",
-      });
-    }
-
-    if (issues.poorTiming) {
-      suggestions.push({
-        area: "Send Timing",
-        suggestion: "Experiment with sending at different times of day",
-        impact: "medium",
-        effort: "medium",
-      });
-    }
-
-    return suggestions;
+  if (issues.lowOpenRate) {
+    suggestions.push({
+      area: "Subject Lines",
+      suggestion: "Try more personalized and action-oriented subject lines",
+      impact: "high",
+      effort: "low",
+    });
   }
+
+  if (issues.lowClickRate) {
+    suggestions.push({
+      area: "Call-to-Action",
+      suggestion: "Include clearer and more prominent CTAs in your emails",
+      impact: "medium",
+      effort: "low",
+    });
+  }
+
+  if (issues.poorTiming) {
+    suggestions.push({
+      area: "Send Timing",
+      suggestion: "Experiment with sending at different times of day",
+      impact: "medium",
+      effort: "medium",
+    });
+  }
+
+  return suggestions;
+}
+
+  private async getUserSendData(userId: string) {
+  return this.prisma.trackedEmail.findMany({
+    where: { userId },
+    select: {
+      createdAt: true,
+      opens: { select: { timestamp: true } },
+      clicks: { select: { timestamp: true } }
+    }
+  });
+}
+
+private async getRecipientEngagementData(recipientEmails: string[]) {
+  if (!recipientEmails.length) return [];
+  return this.prisma.trackedEmail.findMany({
+    where: { recipient: { in: recipientEmails } },
+    select: {
+      recipient: true,
+      opens: { select: { timestamp: true } },
+      clicks: { select: { timestamp: true } }
+    }
+  });
+}
 
   // Mock AI model call - replace with actual AI service integration
   private async callAIModel(params: any): Promise<any> {

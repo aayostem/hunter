@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Plan } from "@prisma/client";
 import { Redis } from "ioredis";
 import { config } from "../config";
 
@@ -13,8 +13,8 @@ export class PaymentService {
       apiVersion: "2023-10-16" as any,
     });
     this.prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-})
+      datasourceUrl: process.env.DATABASE_URL,
+    });
     this.redis = new Redis(config.redis.url);
   }
 
@@ -128,24 +128,25 @@ export class PaymentService {
   ) {
     const { userId, plan } = session.metadata!;
 
-    // Get subscription details
+    if (!userId || !plan) {
+      throw new Error("Missing userId or plan in session metadata");
+    }
+
     const subscription = await this.stripe.subscriptions.retrieve(
       session.subscription as string
     );
 
-    // Update user plan
     await this.prisma.user.update({
       where: { id: userId },
-      data: { plan },
+      data: { plan: plan as Plan },
     });
 
-    // Create subscription record
     await this.prisma.subscription.create({
       data: {
         userId,
         stripeSubscriptionId: subscription.id,
         stripeCustomerId: subscription.customer as string,
-        plan,
+        plan: plan as Plan,
         status: subscription.status,
         currentPeriodStart: new Date(subscription.current_period_start * 1000),
         currentPeriodEnd: new Date(subscription.current_period_end * 1000),
@@ -153,7 +154,6 @@ export class PaymentService {
       },
     });
 
-    // Clear session from Redis
     await this.redis.del(`checkout_session:${session.id}`);
   }
 
@@ -203,12 +203,11 @@ export class PaymentService {
   }
 
   private async handlePaymentFailed(invoice: Stripe.Invoice) {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.subscription.findFirst({
       where: { stripeCustomerId: invoice.customer as string },
     });
 
     if (subscription) {
-      // Send payment failure notification
       await this.redis.publish(
         "payment_events",
         JSON.stringify({
@@ -223,7 +222,6 @@ export class PaymentService {
       );
     }
   }
-
   private getPriceIdForPlan(plan: string): string {
     const priceIds: { [key: string]: string } = {
       PRO: process.env.STRIPE_PRO_PRICE_ID!,
@@ -231,7 +229,12 @@ export class PaymentService {
       ENTERPRISE: process.env.STRIPE_ENTERPRISE_PRICE_ID!,
     };
 
-    return priceIds[plan];
+    const priceId = priceIds[plan];
+    if (!priceId) {
+      throw new Error(`No price ID configured for plan: ${plan}`);
+    }
+
+    return priceId;
   }
 
   async getSubscriptionStatus(userId: string) {

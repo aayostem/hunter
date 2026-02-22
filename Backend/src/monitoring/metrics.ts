@@ -1,4 +1,4 @@
-import client from "prom-client";
+import client, {Metric} from "prom-client";
 
 // Create a Registry to register the metrics
 const register = new client.Registry();
@@ -41,9 +41,8 @@ export const emailTrackingMetrics = {
   }),
 };
 
-// Register custom metrics
 Object.values(emailTrackingMetrics).forEach((metric) => {
-  register.registerMetric(metric);
+  register.registerMetric(metric as Metric<string>);
 });
 
 export { register };

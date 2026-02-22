@@ -94,11 +94,12 @@ export const sendEmail = (opt: EmailOptions) => emailService.sendEmail(opt);
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, code: 'NO_TOKEN', message: 'Authentication required' });
+      res.status(401).json({ success: false, code: 'NO_TOKEN', message: 'Authentication required' });
+      return;
     }
 
     const token = authHeader.substring(7);
@@ -107,18 +108,21 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     try {
       payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
     } catch {
-      return res.status(401).json({ success: false, code: 'INVALID_TOKEN', message: 'Invalid or expired token' });
+      res.status(401).json({ success: false, code: 'INVALID_TOKEN', message: 'Invalid or expired token' });
+      return;
     }
 
     const sessionKey = `session:${payload.sessionId}`;
     const sessionData = await redis.get(sessionKey);
     if (!sessionData) {
-      return res.status(401).json({ success: false, code: 'SESSION_EXPIRED', message: 'Session has expired' });
+      res.status(401).json({ success: false, code: 'SESSION_EXPIRED', message: 'Session has expired' });
+      return;
     }
 
     const session = JSON.parse(sessionData);
     if (session.accessToken !== token) {
-      return res.status(401).json({ success: false, code: 'INVALID_SESSION', message: 'Invalid session' });
+      res.status(401).json({ success: false, code: 'INVALID_SESSION', message: 'Invalid session' });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -127,43 +131,44 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     });
 
     if (!user) {
-      return res.status(401).json({ success: false, code: 'USER_NOT_FOUND', message: 'User not found' });
+      res.status(401).json({ success: false, code: 'USER_NOT_FOUND', message: 'User not found' });
+      return;
     }
 
     req.user = user;
     req.session = session;
 
-    // Fixed: use rememberMe flag instead of expiresAt to determine session length
     await redis.expire(sessionKey, session.rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60);
 
     next();
   } catch (error) {
     logger.error('Authentication error:', error);
-    return res.status(500).json({ success: false, code: 'AUTH_ERROR', message: 'Authentication failed' });
+    res.status(500).json({ success: false, code: 'AUTH_ERROR', message: 'Authentication failed' });
   }
 };
-
-export const requireEmailVerification = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireEmailVerification = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (!req.user?.emailVerified) {
-    return res.status(403).json({ success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Email verification required' });
+    res.status(403).json({ success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Email verification required' });
+    return;
   }
   next();
 };
 
 // Fixed: removed redundant DB call — mfaEnabled is already on req.user from authenticate()
 // Fixed: MFA state now checked via session.mfaVerified (server-side) instead of x-mfa-verified header (client-controlled)
-export const requireMFA = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireMFA = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (req.user?.mfaEnabled && !req.session?.mfaVerified) {
-    return res.status(403).json({ success: false, code: 'MFA_REQUIRED', message: 'MFA verification required' });
+    res.status(403).json({ success: false, code: 'MFA_REQUIRED', message: 'MFA verification required' });
+    return;
   }
   next();
 };
 
 export const requirePlan = (plans: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user?.plan || !plans.includes(req.user.plan)) {
-      // Fixed: don't expose valid plan names in the error response
-      return res.status(403).json({ success: false, code: 'PLAN_REQUIRED', message: 'Your current plan does not support this action' });
+      res.status(403).json({ success: false, code: 'PLAN_REQUIRED', message: 'Your current plan does not support this action' });
+      return;
     }
     next();
   };

@@ -1,8 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Plan } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
 import { Redis } from "ioredis";
+import type { StringValue } from 'ms';
 
 export class AuthService {
   private prisma: PrismaClient;
@@ -15,11 +16,12 @@ export class AuthService {
     this.redis = new Redis(config.redis.url);
   }
 
+
   async register(userData: {
     email: string;
     password: string;
     name: string;
-    plan?: string;
+    plan?: Plan;
   }) {
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -39,7 +41,8 @@ export class AuthService {
         email: userData.email,
         password: hashedPassword,
         name: userData.name,
-        plan: userData.plan || "FREE",
+        
+      plan: (userData.plan as Plan) ?? Plan.FREE,
       },
     });
 
@@ -89,6 +92,7 @@ export class AuthService {
     };
   }
 
+  
   async googleOAuth(profile: any) {
     // Find or create user
     let user = await this.prisma.user.findUnique({
@@ -96,17 +100,17 @@ export class AuthService {
     });
 
     if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          email: profile.email,
-          name: profile.name,
-          plan: "FREE",
-          avatar: profile.picture,
-          emailVerified: true,
-        },
-      });
+user = await this.prisma.user.create({
+  data: {
+    email: profile.email,
+    name: profile.name,
+    plan: Plan.FREE,
+    avatar: profile.picture,
+    emailVerified: true,
+    password: await bcrypt.hash(crypto.randomUUID(), 12), // unusable password
+  },
+});
     }
-
     // Generate tokens
     const tokens = this.generateTokens(user.id, user.email);
     await this.storeRefreshToken(user.id, tokens.refreshToken);
@@ -195,25 +199,25 @@ export class AuthService {
   }
 
   async upgradePlan(userId: string, newPlan: string) {
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: { plan: newPlan },
-    });
+  const user = await this.prisma.user.update({
+    where: { id: userId },
+    data: { plan: newPlan as Plan },
+  });
+  return this.sanitizeUser(user);
+}
 
-    return this.sanitizeUser(user);
-  }
 
-  private generateTokens(userId: string, email: string) {
-    const accessToken = jwt.sign({ userId, email }, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn,
-    });
+private generateTokens(userId: string, email: string) {
+  const accessToken = jwt.sign({ userId, email }, config.jwt.secret, {
+    expiresIn: config.jwt.expiresIn as StringValue,
+  });
 
-    const refreshToken = jwt.sign({ userId, email }, config.jwt.secret, {
-      expiresIn: "30d",
-    });
+  const refreshToken = jwt.sign({ userId, email }, config.jwt.secret, {
+    expiresIn: '30d',
+  });
 
-    return { accessToken, refreshToken };
-  }
+  return { accessToken, refreshToken };
+}
 
   private async storeRefreshToken(userId: string, refreshToken: string) {
     // Store with 30 days expiration
