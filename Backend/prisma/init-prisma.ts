@@ -20,3 +20,5 @@ prisma.$on("query", (e) => {
 });
 
 export default prisma;
+
+

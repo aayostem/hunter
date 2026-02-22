@@ -1,10 +1,16 @@
 generator client {
   provider = "prisma-client-js"
+  // Enable preview features for better Supabase compatibility
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // directUrl = env("DIRECT_URL2") // Add this for migrations
+  
+  // Enable necessary PostgreSQL extensions
+  // extensions = [uuidOssp(map: "uuid-ossp"), pgcrypto(map: "pgcrypto")]
 }
 
 model User {

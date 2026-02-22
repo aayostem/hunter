@@ -1,8 +1,8 @@
-// import express from "express";
+import express from "express";
 // import { AIInsightsService } from "../../services/ai-insights-service";
 // import { authenticate, requirePlan } from "../middleware/auth";
 
-// export const aiRoutes = express.Router();
+export const aiRoutes = express.Router();
 // const aiService = new AIInsightsService();
 
 // aiRoutes.get(

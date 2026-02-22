@@ -1,6 +1,6 @@
 import express from "express";
 import { PaymentService } from "../../services/payment-service";
-import { authenticate, requirePlan } from "../../middleware/auth";
+import { authenticate } from "../middleware/auth";
 
 export const paymentRoutes = express.Router();
 const paymentService = new PaymentService();

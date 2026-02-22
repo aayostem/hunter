@@ -1,13 +1,21 @@
 import rateLimit from 'express-rate-limit';
-import RedisStore from 'rate-limit-redis';
-import {redis} from '../../lib/redis'
+import RedisStore, { RedisReply } from 'rate-limit-redis';
+import { redis } from '../../lib/redis';
 
 const makeStore = (prefix: string) =>
   new RedisStore({
     prefix,
-    sendCommand: (...args: string[]) => (redis as any).sendCommand(args)
+    sendCommand: async (...args: string[]): Promise<RedisReply> => {
+      // args[0] is the command (e.g., 'evalsha' or 'incr')
+      // ! tells TS: "Trust me, this isn't undefined"
+      const command = args[0]!; 
+      const payload = args.slice(1);
+      
+      return (await redis.call(command, ...payload)) as RedisReply;
+    },
   });
 
+// ... rest of your limiters stay the same
 const limiter = (
   windowMs: number,
   max: number,
@@ -24,7 +32,7 @@ const limiter = (
       res.status(429).json({ success: false, code: 'RATE_LIMITED', message })
   });
 
-// --- Exported limiters ---
+// --- Exported limiters remain the same ---
 
 export const globalRateLimiter = limiter(
   15 * 60 * 1000, 100,
