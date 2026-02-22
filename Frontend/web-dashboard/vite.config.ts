@@ -7,6 +7,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+      build: {
+    outDir: 'build', // This is where your built files will go
+    emptyOutDir: true, // Cleans the build folder before building
+    sourcemap: true, // Optional: generates source maps
+  },
     server: {
       port: 5173,
       open: true,
@@ -17,5 +22,6 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(env.npm_package_version),
     },
+
   };
 });
