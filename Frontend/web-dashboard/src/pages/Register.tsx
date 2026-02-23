@@ -24,6 +24,7 @@ interface InputFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElemen
   name: keyof RegisterFormData;
   value: string;
   onChange: React.Dispatch<React.SetStateAction<RegisterFormData>>;
+  error?: string;
 }
 
 interface ApiError {
@@ -38,11 +39,28 @@ export const Register: React.FC = () => {
     formData, setFormData, status, setStatus, 
     security, setSecurity, passwordStrength, validate 
   } = useRegister();
-  
+
   const [showPass, setShowPass] = React.useState(false);
+
+  // Ref for race-condition-free comparison
+  const confirmPasswordRef = React.useRef('');
+  const [confirmDisplay, setConfirmDisplay] = React.useState('');
+  const [confirmTouched, setConfirmTouched] = React.useState(false);
+
+  const passwordMismatch = confirmTouched && confirmDisplay !== formData.password;
+  const passwordMatch = confirmTouched && confirmDisplay === formData.password && confirmDisplay !== '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Compare against ref — always synchronously current, no stale state
+    if (formData.password !== confirmPasswordRef.current) {
+      setConfirmTouched(true);
+      return;
+    }
+
+    setConfirmTouched(false);
+
     const error = validate();
     if (error) return setStatus(s => ({ ...s, error }));
     if (security.cooldown > 0) return;
@@ -76,8 +94,8 @@ export const Register: React.FC = () => {
   return (
     <div className="min-h-screen bg-white flex">
 
-      {/* Left panel — hidden on mobile, visible on lg+ */}
-      <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col justify-between p-12 text-white">
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-1/2 linear-to-br from-blue-600 via-blue-700 to-indigo-800 flex-col justify-between p-12 text-white">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/20 rounded-xl">
             <Shield className="w-6 h-6" />
@@ -112,12 +130,10 @@ export const Register: React.FC = () => {
           </div>
         </div>
 
-        <p className="text-blue-300 text-sm">
-          © 2025 EmailSuite. Trusted by 10,000+ marketers.
-        </p>
+        <p className="text-blue-300 text-sm">© 2025 EmailSuite. Trusted by 10,000+ marketers.</p>
       </div>
 
-      {/* Right panel — form */}
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center px-6 py-10 sm:px-10 lg:px-16 bg-slate-50">
         <div className="w-full max-w-md">
 
@@ -139,7 +155,6 @@ export const Register: React.FC = () => {
             )}
           </div>
 
-          {/* Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
             {status.error && (
               <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg flex items-start gap-2 text-sm">
@@ -159,6 +174,7 @@ export const Register: React.FC = () => {
                 value={formData.email} onChange={setFormData} placeholder="john@example.com" 
               />
 
+              {/* Password */}
               <div className="relative">
                 <InputField 
                   icon={<Lock size={16}/>} label="Password" name="password" 
@@ -175,6 +191,7 @@ export const Register: React.FC = () => {
                 </button>
               </div>
 
+              {/* Password strength */}
               {formData.password && (
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-4 gap-1.5">
@@ -195,6 +212,41 @@ export const Register: React.FC = () => {
                 </div>
               )}
 
+              {/* Confirm Password */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Confirm Password</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Lock size={16}/>
+                  </span>
+                  <input
+                    type={showPass ? "text" : "password"}
+                    value={confirmDisplay}
+                    onChange={e => {
+                      confirmPasswordRef.current = e.target.value;
+                      setConfirmDisplay(e.target.value);
+                    }}
+                    onBlur={() => setConfirmTouched(true)}
+                    placeholder="Re-enter your password"
+                    className={`w-full pl-9 pr-10 py-2.5 border rounded-lg focus:ring-2 focus:border-transparent outline-none transition-all text-sm bg-white ${
+                      passwordMismatch 
+                        ? 'border-red-400 focus:ring-red-400' 
+                        : passwordMatch 
+                          ? 'border-green-400 focus:ring-green-400' 
+                          : 'border-gray-200 focus:ring-blue-500'
+                    }`}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {passwordMismatch && <AlertCircle size={16} className="text-red-400"/>}
+                    {passwordMatch && <CheckCircle size={16} className="text-green-500"/>}
+                  </span>
+                </div>
+                {passwordMismatch && (
+                  <p className="text-xs text-red-500">Passwords do not match</p>
+                )}
+              </div>
+
+              {/* Terms */}
               <label className="flex items-start gap-3 cursor-pointer group pt-1">
                 <input 
                   type="checkbox" 
@@ -210,6 +262,7 @@ export const Register: React.FC = () => {
                 </span>
               </label>
 
+              {/* Submit */}
               <button
                 type="submit"
                 disabled={status.loading || security.cooldown > 0}
@@ -237,20 +290,23 @@ export const Register: React.FC = () => {
 };
 
 const InputField: React.FC<InputFieldProps> = ({ 
-  label, icon, name, value, onChange, ...props 
+  label, icon, name, value, onChange, error, ...props 
 }) => (
   <div className="flex flex-col gap-1.5">
     <label className="text-sm font-medium text-gray-700">{label}</label>
     <div className="relative">
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{icon}</span>
       <input 
-        className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm bg-white"
+        className={`w-full pl-9 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:border-transparent outline-none transition-all text-sm bg-white ${
+          error ? 'border-red-400 focus:ring-red-400' : 'border-gray-200 focus:ring-blue-500'
+        }`}
         name={name}
         value={value}
         onChange={e => onChange(prev => ({ ...prev, [name]: e.target.value }))}
         {...props}
       />
     </div>
+    {error && <p className="text-xs text-red-500">{error}</p>}
   </div>
 );
 

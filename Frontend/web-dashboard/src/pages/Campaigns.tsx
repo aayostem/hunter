@@ -639,7 +639,7 @@ export const Campaigns: React.FC = () => {
   }, []);
 
   // Get status icon
-  const getStatusIcon = (status: CampaignStatus): JSX.Element | null => {
+const getStatusIcon = (status: CampaignStatus): React.ReactNode => {
     switch (status) {
       case 'active':
       case 'sending':
@@ -660,7 +660,6 @@ export const Campaigns: React.FC = () => {
         return null;
     }
   };
-
   // Columns definition
   const columns: Column<Campaign>[] = [
     {

@@ -18,14 +18,13 @@ export const useRegister = () => {
     success: false 
   });
 
-  // FIX: Initialize CSRF inside useState to avoid the useEffect cascading render error
   const [security, setSecurity] = useState(() => ({ 
     csrf: generateCSRFToken(), 
     attempts: 0, 
     cooldown: 0 
   }));
 
-  // Cooldown Timer: Stays in useEffect because it synchronizes with the window.setInterval API
+  // Cooldown timer
   useEffect(() => {
     if (security.cooldown > 0) {
       const timer = setInterval(() => {
@@ -44,16 +43,16 @@ export const useRegister = () => {
       num: /[0-9]/.test(p),
       special: /[!@#$%^&*]/.test(p)
     };
-    // Score typed as 0-5
     const score = Object.values(reqs).filter(Boolean).length;
     return { score, reqs };
   }, [formData.password]);
 
+  // Password match is intentionally NOT checked here —
+  // Register component handles it via ref to avoid race conditions
   const validate = () => {
     if (formData.name.length < 2) return "Name must be at least 2 characters";
     if (!validateEmail(formData.email)) return "Please enter a valid email";
     if (passwordStrength.score < 4) return "Password is not strong enough";
-    if (formData.password !== formData.confirmPassword) return "Passwords do not match";
     if (!formData.agreeTerms) return "You must agree to the terms";
     return null;
   };

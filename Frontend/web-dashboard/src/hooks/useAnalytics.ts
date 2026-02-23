@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 // Types
 export interface TimeSeriesData {
@@ -109,6 +110,80 @@ interface UseAnalyticsOptions {
   cacheTime?: number;
 }
 
+// Raw data types from Supabase
+interface RawAnalyticsData {
+  total_sent?: number;
+  total_opens?: number;
+  total_unique_opens?: number;
+  total_clicks?: number;
+  total_unique_clicks?: number;
+  total_unsubscribes?: number;
+  total_bounces?: number;
+  avg_open_rate?: number;
+  avg_click_rate?: number;
+  time_series?: Array<{
+    timestamp: string;
+    value: number;
+    metric: string;
+  }>;
+  campaigns?: Array<{
+    campaign_id: string;
+    campaign_name: string;
+    sent: number;
+    opens: number;
+    unique_opens: number;
+    clicks: number;
+    unique_clicks: number;
+    unsubscribes: number;
+    bounces: number;
+    complaints: number;
+  }>;
+  device_breakdown?: Array<{
+    device: string;
+    count: number;
+  }>;
+  location_breakdown?: Array<{
+    country: string;
+    country_code: string;
+    count: number;
+  }>;
+  browser_breakdown?: Array<{
+    browser: string;
+    count: number;
+  }>;
+  link_clicks?: Array<{
+    link_id: string;
+    url: string;
+    clicks: number;
+    unique_clicks: number;
+  }>;
+  time_of_day?: Array<{
+    hour: number;
+    opens: number;
+    clicks: number;
+  }>;
+  day_of_week?: Array<{
+    day: string;
+    opens: number;
+    clicks: number;
+  }>;
+}
+
+// RPC Parameters type
+interface AnalyticsRpcParams {
+  p_user_id: string;
+  p_start_date: string;
+  p_end_date: string;
+  p_group_by: 'hour' | 'day' | 'week' | 'month';
+  p_campaign_ids: string[];
+}
+
+// RPC Response type
+interface AnalyticsRpcResponse {
+  data: RawAnalyticsData | null;
+  error: Error | null;
+}
+
 const DEFAULT_FILTERS: AnalyticsFilters = {
   dateRange: {
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -117,6 +192,34 @@ const DEFAULT_FILTERS: AnalyticsFilters = {
   groupBy: 'day',
   comparePrevious: false,
 };
+
+// Helper function to call analytics RPC with proper typing
+async function callAnalyticsRpc(
+  params: AnalyticsRpcParams
+): Promise<AnalyticsRpcResponse> {
+  try {
+    // Use unknown instead of any
+    const rpcFunction = supabase.rpc as unknown as (
+      fn: string, 
+      args: AnalyticsRpcParams
+    ) => Promise<{
+      data: unknown;
+      error: unknown;
+    }>;
+    
+    const response = await rpcFunction('get_analytics', params);
+    
+    return {
+      data: response.data ? response.data as RawAnalyticsData : null,
+      error: response.error ? response.error as Error : null
+    };
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error('Unknown error')
+    };
+  }
+}
 
 export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
   const { user } = useAuth();
@@ -127,8 +230,6 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<AnalyticsFilters>(DEFAULT_FILTERS);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['opens', 'clicks']);
-
-  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null);
 
   // Calculate date ranges
   const dateRanges = useMemo(() => {
@@ -151,83 +252,43 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     };
   }, [filters.dateRange]);
 
-  // Fetch analytics data
-  const fetchAnalytics = useCallback(async (compare: boolean = false) => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Fetch main period data
-      const { data: currentData, error: currentError } = await supabase
-        .rpc('get_analytics', {
-          p_user_id: user.id,
-          p_start_date: dateRanges.current.start,
-          p_end_date: dateRanges.current.end,
-          p_group_by: filters.groupBy,
-          p_campaign_ids: filters.campaignIds || [],
-        });
-
-      if (currentError) throw currentError;
-
-      let comparisonData = null;
-      
-      // Fetch comparison data if requested
-      if (compare && filters.comparePrevious) {
-        const { data: prevData, error: prevError } = await supabase
-          .rpc('get_analytics', {
-            p_user_id: user.id,
-            p_start_date: dateRanges.previous.start,
-            p_end_date: dateRanges.previous.end,
-            p_group_by: filters.groupBy,
-            p_campaign_ids: filters.campaignIds || [],
-          });
-
-        if (prevError) throw prevError;
-        comparisonData = prevData;
-      }
-
-      // Process and transform data
-      const processedReport = processAnalyticsData(currentData, comparisonData);
-      setReport(processedReport);
-
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch analytics';
-      setError(message);
-      showToast(message, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, filters, dateRanges, showToast]);
+  // Helper to calculate rates with safe number handling
+  const calculateRate = useCallback((part: number | undefined, total: number | undefined): number => {
+    const safePart = part || 0;
+    const safeTotal = total || 0;
+    if (safeTotal === 0) return 0;
+    return Number(((safePart / safeTotal) * 100).toFixed(2));
+  }, []);
 
   // Process raw analytics data
-  const processAnalyticsData = useCallback((current: any, previous: any | null): AnalyticsReport => {
+  const processAnalyticsData = useCallback((current: RawAnalyticsData | null, previous: RawAnalyticsData | null): AnalyticsReport => {
+    const safeCurrent = current || {};
+    
     // Calculate summary
     const summary = {
-      totalSent: current?.total_sent || 0,
-      totalOpens: current?.total_opens || 0,
-      totalUniqueOpens: current?.total_unique_opens || 0,
-      totalClicks: current?.total_clicks || 0,
-      totalUniqueClicks: current?.total_unique_clicks || 0,
-      totalUnsubscribes: current?.total_unsubscribes || 0,
-      totalBounces: current?.total_bounces || 0,
-      overallOpenRate: calculateRate(current?.total_unique_opens, current?.total_sent),
-      overallClickRate: calculateRate(current?.total_unique_clicks, current?.total_sent),
-      overallBounceRate: calculateRate(current?.total_bounces, current?.total_sent),
-      averageOpenRate: current?.avg_open_rate || 0,
-      averageClickRate: current?.avg_click_rate || 0,
+      totalSent: safeCurrent.total_sent || 0,
+      totalOpens: safeCurrent.total_opens || 0,
+      totalUniqueOpens: safeCurrent.total_unique_opens || 0,
+      totalClicks: safeCurrent.total_clicks || 0,
+      totalUniqueClicks: safeCurrent.total_unique_clicks || 0,
+      totalUnsubscribes: safeCurrent.total_unsubscribes || 0,
+      totalBounces: safeCurrent.total_bounces || 0,
+      overallOpenRate: calculateRate(safeCurrent.total_unique_opens, safeCurrent.total_sent),
+      overallClickRate: calculateRate(safeCurrent.total_unique_clicks, safeCurrent.total_sent),
+      overallBounceRate: calculateRate(safeCurrent.total_bounces, safeCurrent.total_sent),
+      averageOpenRate: safeCurrent.avg_open_rate || 0,
+      averageClickRate: safeCurrent.avg_click_rate || 0,
     };
 
     // Process time series data
-    const timeSeries: TimeSeriesData[] = (current?.time_series || []).map((item: any) => ({
+    const timeSeries: TimeSeriesData[] = (safeCurrent.time_series || []).map((item) => ({
       timestamp: item.timestamp,
       value: item.value,
       metric: item.metric,
     }));
 
     // Process campaign performance
-    const campaignPerformance: CampaignPerformance[] = (current?.campaigns || []).map((item: any) => ({
+    const campaignPerformance: CampaignPerformance[] = (safeCurrent.campaigns || []).map((item) => ({
       campaignId: item.campaign_id,
       campaignName: item.campaign_name,
       sent: item.sent,
@@ -245,30 +306,32 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     }));
 
     // Process device breakdown
-    const total = current?.device_breakdown?.reduce((acc: number, d: any) => acc + d.count, 0) || 0;
-    const deviceBreakdown: DeviceBreakdown[] = (current?.device_breakdown || []).map((item: any) => ({
-      device: item.device,
+    const deviceTotal = safeCurrent.device_breakdown?.reduce((acc, d) => acc + d.count, 0) || 0;
+    const deviceBreakdown: DeviceBreakdown[] = (safeCurrent.device_breakdown || []).map((item) => ({
+      device: item.device as DeviceBreakdown['device'],
       count: item.count,
-      percentage: calculateRate(item.count, total),
+      percentage: calculateRate(item.count, deviceTotal),
     }));
 
     // Process location breakdown
-    const locationBreakdown: LocationBreakdown[] = (current?.location_breakdown || []).map((item: any) => ({
+    const locationTotal = safeCurrent.location_breakdown?.reduce((acc, d) => acc + d.count, 0) || 0;
+    const locationBreakdown: LocationBreakdown[] = (safeCurrent.location_breakdown || []).map((item) => ({
       country: item.country,
       countryCode: item.country_code,
       count: item.count,
-      percentage: calculateRate(item.count, total),
+      percentage: calculateRate(item.count, locationTotal),
     }));
 
     // Process browser breakdown
-    const browserBreakdown: BrowserBreakdown[] = (current?.browser_breakdown || []).map((item: any) => ({
+    const browserTotal = safeCurrent.browser_breakdown?.reduce((acc, d) => acc + d.count, 0) || 0;
+    const browserBreakdown: BrowserBreakdown[] = (safeCurrent.browser_breakdown || []).map((item) => ({
       browser: item.browser,
       count: item.count,
-      percentage: calculateRate(item.count, total),
+      percentage: calculateRate(item.count, browserTotal),
     }));
 
     // Process link clicks
-    const linkClicks: LinkClickStats[] = (current?.link_clicks || []).map((item: any) => ({
+    const linkClicks: LinkClickStats[] = (safeCurrent.link_clicks || []).map((item) => ({
       linkId: item.link_id,
       url: item.url,
       clicks: item.clicks,
@@ -277,14 +340,14 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
     }));
 
     // Process time of day
-    const timeOfDay: TimeOfDayStats[] = (current?.time_of_day || []).map((item: any) => ({
+    const timeOfDay: TimeOfDayStats[] = (safeCurrent.time_of_day || []).map((item) => ({
       hour: item.hour,
       opens: item.opens,
       clicks: item.clicks,
     }));
 
     // Process day of week
-    const dayOfWeek: DayOfWeekStats[] = (current?.day_of_week || []).map((item: any) => ({
+    const dayOfWeek: DayOfWeekStats[] = (safeCurrent.day_of_week || []).map((item) => ({
       day: item.day,
       opens: item.opens,
       clicks: item.clicks,
@@ -303,9 +366,9 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
 
       const changes: Record<string, { absolute: number; percentage: number }> = {};
       
-      Object.keys(prevSummary).forEach(key => {
-        const currentVal = summary[key as keyof typeof summary] as number;
-        const prevVal = prevSummary[key as keyof typeof prevSummary] as number;
+      (Object.keys(prevSummary) as Array<keyof typeof prevSummary>).forEach((key) => {
+        const currentVal = summary[key];
+        const prevVal = prevSummary[key];
         changes[key] = {
           absolute: currentVal - prevVal,
           percentage: prevVal ? ((currentVal - prevVal) / prevVal) * 100 : 100,
@@ -330,25 +393,74 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
       dayOfWeek,
       comparison,
     };
-  }, []);
+  }, [calculateRate]);
 
-  // Helper to calculate rates
-  const calculateRate = (part: number, total: number): number => {
-    if (!total || total === 0) return 0;
-    return Number(((part / total) * 100).toFixed(2));
-  };
+  // Fetch analytics data
+  const fetchAnalytics = useCallback(async (compare: boolean = false) => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Prepare RPC parameters
+      const rpcParams: AnalyticsRpcParams = {
+        p_user_id: user.id,
+        p_start_date: dateRanges.current.start,
+        p_end_date: dateRanges.current.end,
+        p_group_by: filters.groupBy,
+        p_campaign_ids: filters.campaignIds || [],
+      };
+
+      // Fetch main period data
+      const { data: currentData, error: currentError } = await callAnalyticsRpc(rpcParams);
+
+      if (currentError) throw currentError;
+
+      let previousData: RawAnalyticsData | null = null;
+      
+      // Fetch comparison data if requested
+      if (compare && filters.comparePrevious) {
+        const previousParams: AnalyticsRpcParams = {
+          p_user_id: user.id,
+          p_start_date: dateRanges.previous.start,
+          p_end_date: dateRanges.previous.end,
+          p_group_by: filters.groupBy,
+          p_campaign_ids: filters.campaignIds || [],
+        };
+
+        const { data: prevData, error: prevError } = await callAnalyticsRpc(previousParams);
+
+        if (prevError) throw prevError;
+        previousData = prevData;
+      }
+
+      // Process and transform data
+      const processedReport = processAnalyticsData(currentData, previousData);
+      setReport(processedReport);
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch analytics';
+      setError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, filters, dateRanges, processAnalyticsData, showToast]);
 
   // Set up realtime subscriptions
   useEffect(() => {
+    let subscription: RealtimeChannel | null = null;
+
     if (options.realtime && user) {
-      const subscription = supabase
+      subscription = supabase
         .channel('analytics_changes')
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
-            table: 'opens',
+            table: 'email_opens',
             filter: `user_id=eq.${user.id}`,
           },
           () => {
@@ -358,10 +470,8 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
         )
         .subscribe();
 
-      setRealtimeSubscription(subscription);
-
       return () => {
-        subscription.unsubscribe();
+        subscription?.unsubscribe();
       };
     }
   }, [user, options.realtime, fetchAnalytics]);
@@ -385,19 +495,20 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
         a.href = url;
         a.download = `analytics_${filters.dateRange.start}_to_${filters.dateRange.end}.json`;
         a.click();
+        URL.revokeObjectURL(url);
       } else if (format === 'csv') {
         // Generate CSV report
         const rows = [
           ['Metric', 'Value'],
-          ['Total Sent', report.summary.totalSent],
-          ['Total Opens', report.summary.totalOpens],
-          ['Unique Opens', report.summary.totalUniqueOpens],
+          ['Total Sent', report.summary.totalSent.toString()],
+          ['Total Opens', report.summary.totalOpens.toString()],
+          ['Unique Opens', report.summary.totalUniqueOpens.toString()],
           ['Open Rate', `${report.summary.overallOpenRate}%`],
-          ['Total Clicks', report.summary.totalClicks],
-          ['Unique Clicks', report.summary.totalUniqueClicks],
+          ['Total Clicks', report.summary.totalClicks.toString()],
+          ['Unique Clicks', report.summary.totalUniqueClicks.toString()],
           ['Click Rate', `${report.summary.overallClickRate}%`],
-          ['Bounces', report.summary.totalBounces],
-          ['Unsubscribes', report.summary.totalUnsubscribes],
+          ['Bounces', report.summary.totalBounces.toString()],
+          ['Unsubscribes', report.summary.totalUnsubscribes.toString()],
         ];
 
         const csv = rows.map(row => row.join(',')).join('\n');
@@ -407,6 +518,7 @@ export const useAnalytics = (options: UseAnalyticsOptions = {}) => {
         a.href = url;
         a.download = `analytics_${filters.dateRange.start}_to_${filters.dateRange.end}.csv`;
         a.click();
+        URL.revokeObjectURL(url);
       }
 
       showToast('Report exported successfully', 'success');

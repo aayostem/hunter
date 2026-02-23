@@ -482,7 +482,7 @@ export const CampaignDetail: React.FC = () => {
   }, [campaign]);
 
   // Get Status Icon
-  const getStatusIcon = (): JSX.Element | null => {
+const getStatusIcon = (): React.ReactNode => {
     if (!campaign) return null;
     
     switch (campaign.status) {
@@ -503,8 +503,7 @@ export const CampaignDetail: React.FC = () => {
     }
   };
 
-  // Action Button
-  const getActionButton = (): JSX.Element | null => {
+  const getActionButton = (): React.ReactNode => {
     if (!campaign) return null;
 
     switch (campaign.status) {
