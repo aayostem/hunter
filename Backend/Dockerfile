@@ -1,31 +1,31 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Build stage - Use Node.js 20 or 22
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm@8
+# Install build dependencies for Prisma
+RUN apk add --no-cache openssl libc6-compat
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with npm
+RUN npm ci
 
-# Generate Prisma client
-RUN pnpm prisma generate
+# Generate Prisma client with retry logic
+RUN npx prisma generate || (sleep 5 && npx prisma generate)
 
 # Copy source code
 COPY . .
 
 # Build
-RUN pnpm build
+RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
-RUN apk add --no-cache tzdata dumb-init
+RUN apk add --no-cache tzdata dumb-init openssl libc6-compat
 
 WORKDIR /app
 
@@ -35,13 +35,12 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # Copy built application
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/pnpm-lock.yaml ./
+COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/package-lock.json* ./
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
 # Install production dependencies only
-RUN npm install -g pnpm@8 && \
-    pnpm install --prod --frozen-lockfile
+RUN npm ci --only=production
 
 # Copy entrypoint script
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /usr/local/bin/
