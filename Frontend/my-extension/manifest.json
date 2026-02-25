@@ -1,0 +1,47 @@
+{
+    "manifest_version": 3,
+    "name": "Email Suite - Email Tracker for Gmail",
+    "version": "1.0.0",
+    "description": "Track email opens, clicks, and boost productivity",
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting",
+        "notifications"
+    ],
+    "host_permissions": [
+        "https://mail.google.com/*",
+        "https://*.emailsuite.com/*"
+    ],
+    "background": {
+        "service_worker": "dist/background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://mail.google.com/*"
+            ],
+            "js": [
+                "dist/content-scripts/gmail-injector.js"
+            ],
+            "css": [
+                "dist/styles/inject.css"
+            ]
+        }
+    ],
+    "action": {
+        "default_popup": "dist/popup/index.html",
+        "default_title": "Email Suite"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "dist/tracking-pixel.png"
+            ],
+            "matches": [
+                "https://mail.google.com/*"
+            ]
+        }
+    ]
+}
