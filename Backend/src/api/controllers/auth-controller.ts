@@ -11,6 +11,21 @@ import { metrics } from '../../lib/metrics';
 import { auditLog } from '../../lib/auditLog';
 
 export class AuthController {
+    constructor() {
+    // Bind all methods to maintain 'this' context
+    this.register = this.register.bind(this);
+    this.login = this.login.bind(this);
+    this.refresh = this.refresh.bind(this);
+    this.logout = this.logout.bind(this);
+    this.me = this.me.bind(this);
+    this.changePassword = this.changePassword.bind(this);
+    this.forgotPassword = this.forgotPassword.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
+    this.verifyEmail = this.verifyEmail.bind(this);
+    this.setupMFA = this.setupMFA.bind(this);
+    this.verifyMFA = this.verifyMFA.bind(this);
+    this.disableMFA = this.disableMFA.bind(this);
+  }
   // --- PUBLIC ---
 
   async register(req: Request, res: Response) {

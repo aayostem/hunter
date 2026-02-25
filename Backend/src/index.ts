@@ -85,6 +85,7 @@ app.use('*', (req, res) => {
 });
 
 server.listen(config.port, () => {
+  console.log(`localhost:${config.port}`);
   logger.info(`Email Suite API running on port ${config.port}`);
   logger.info(`WebSocket server initialized`);
 });

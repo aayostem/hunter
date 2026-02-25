@@ -21,8 +21,9 @@ async function testConnection(DATABASE_URL) {
   }
 }
 
-testConnection(process.env.DATABASE_URL);
+testConnection(process.env.DIRECT_URL)
 setTimeout(() => {
   console.log('\nTesting second database connection after 5 seconds...');
 }, 5000);
-testConnection(process.env.DATABASE_URL2);
+testConnection(process.env.DATABASE_URL2)
+testConnection(process.env.DATABASE_URL);
