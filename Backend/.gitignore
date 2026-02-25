@@ -1,4 +1,4 @@
-# íº€ Email Suite - Git Ignore File
+# ï¿½ï¿½ï¿½ Email Suite - Git Ignore File
 
 # Node.js
 node_modules/
@@ -35,7 +35,7 @@ postgres_data/
 redis_data/
 
 # Dependencies (root)
-package-lock.json
+# package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
