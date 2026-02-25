@@ -9,6 +9,23 @@ export interface PlanFeatures {
   trackingPixelType: 'basic' | 'advanced';
   retentionDays: number;
 }
+interface PlanData {
+  id?: string;
+  name?: string;
+  status?: 'active' | 'expired' | 'cancelled' | 'trial';
+  features?: {
+    maxTrackedEmails?: number;
+    hasAdvancedAnalytics?: boolean;
+    hasCustomDomain?: boolean;
+    hasTeamMembers?: boolean;
+    supportLevel?: string;
+    trackingPixelType?: string;
+    retentionDays?: number;
+  };
+  expiresAt?: string | null;
+  trialEndsAt?: string | null;
+}
+
 
 export interface UserPlan {
   id: string;
@@ -49,19 +66,18 @@ export class PlanUpgradeManager {
   private getFromStorage(key: string): Promise<string | null> {
     return new Promise((resolve) => {
       chrome.storage.local.get([key], (result) => {
-        resolve(result[key] || null);
-      });
+resolve((result[key] as string) || null);      });
     });
   }
 
-  private saveToStorage(key: string, value: any): Promise<void> {
-    return new Promise((resolve) => {
-      chrome.storage.local.set({ [key]: JSON.stringify(value) }, () => {
-        resolve();
-      });
+private saveToStorage<T>(key: string, value: T): Promise<void> {
+  return new Promise((resolve) => {
+    // We stringify T to store it as a JSON string
+    chrome.storage.local.set({ [key]: JSON.stringify(value) }, () => {
+      resolve();
     });
-  }
-
+  });
+}
   private async fetchPlanFromAPI(): Promise<void> {
     try {
       const response = await fetch(`${this.apiEndpoint}/user/plan`, {
@@ -86,29 +102,31 @@ export class PlanUpgradeManager {
   private getAuthToken(): Promise<string> {
     return new Promise((resolve) => {
       chrome.storage.local.get(['authToken'], (result) => {
-        resolve(result.authToken || '');
-      });
+resolve((result.authToken as string) || '');      });
     });
   }
 
-  private parsePlanData(data: any): UserPlan {
-    return {
-      id: data.id || 'free-plan',
-      name: data.name || 'free',
-      status: data.status || 'active',
-      features: {
-        maxTrackedEmails: data.features?.maxTrackedEmails || 100,
-        hasAdvancedAnalytics: data.features?.hasAdvancedAnalytics || false,
-        hasCustomDomain: data.features?.hasCustomDomain || false,
-        hasTeamMembers: data.features?.hasTeamMembers || false,
-        supportLevel: data.features?.supportLevel || 'basic',
-        trackingPixelType: data.features?.trackingPixelType || 'basic',
-        retentionDays: data.features?.retentionDays || 30
-      },
-      expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-      trialEndsAt: data.trialEndsAt ? new Date(data.trialEndsAt) : null
-    };
-  }
+private parsePlanData(data: PlanData): UserPlan {
+  return {
+    id: data.id || 'free-plan',
+    // Cast the string/default to the specific Literal Type
+    name: (data.name || 'free') as "free" | "starter" | "professional" | "enterprise",
+    status: data.status || 'active',
+    features: {
+      maxTrackedEmails: data.features?.maxTrackedEmails || 100,
+      hasAdvancedAnalytics: data.features?.hasAdvancedAnalytics || false,
+      hasCustomDomain: data.features?.hasCustomDomain || false,
+      hasTeamMembers: data.features?.hasTeamMembers || false,
+      // Cast the support level
+      supportLevel: (data.features?.supportLevel || 'basic') as "basic" | "priority" | "dedicated",
+      // Cast the tracking pixel type
+      trackingPixelType: (data.features?.trackingPixelType || 'basic') as "basic" | "advanced",
+      retentionDays: data.features?.retentionDays || 30
+    },
+    expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+    trialEndsAt: data.trialEndsAt ? new Date(data.trialEndsAt) : null
+  };
+}
 
   private getDefaultPlan(): UserPlan {
     return {

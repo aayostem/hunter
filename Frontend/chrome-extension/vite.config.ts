@@ -1,13 +1,12 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { resolve } from "path";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react()],
-  // Remove root temporarily for debugging
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
     rollupOptions: {
       input: {
         popup: resolve(__dirname, "src/popup/index.html"),
@@ -15,9 +14,10 @@ export default defineConfig({
         content: resolve(__dirname, "src/content-scripts/gmail-injector.ts"),
       },
       output: {
-        entryFileNames: "[name].js",
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]',
       },
     },
   },
-  publicDir: 'public',
 });

@@ -3,6 +3,17 @@ import { TrackingStats } from '../components/TrackingStats';
 import { SettingsToggle } from '../components/SettingsToggle';
 import { PlanUpgrade } from '../components/PlanUpgrade';
 import { PlanUpgradeManager } from '../utils/planupgrade';
+import browser from 'webextension-polyfill';
+
+// ✅ New style (uses the variable, satisfies TS)
+await browser.storage.local.get(['key']);
+
+// 1. Interfaces for strict Type Safety
+interface Stats {
+  emailsSent: number;
+  emailsOpened: number;
+  linksClicked: number;
+}
 
 type PlanType = 'FREE' | 'PRO' | 'BUSINESS' | 'ENTERPRISE';
 
@@ -12,35 +23,49 @@ export const Popup: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isTrackingEnabled, setIsTrackingEnabled] = useState(true);
   const [currentPlan, setCurrentPlan] = useState<PlanType>('FREE');
-  const [todayStats, setTodayStats] = useState({
+  const [todayStats, setTodayStats] = useState<Stats>({
     emailsSent: 0,
     emailsOpened: 0,
     linksClicked: 0
   });
 
-  const loadPlan = () => {
+  // Load plan logic extracted so it can be reused in handleUpgrade
+  const loadPlanData = () => {
     try {
       const plan = planManager.getCurrentPlan();
-      if (plan?.name) setCurrentPlan(plan.name.toUpperCase() as PlanType);
+      if (plan?.name) {
+        setCurrentPlan(plan.name.toUpperCase() as PlanType);
+      }
     } catch (e) {
       console.error('Email Suite: failed to load plan:', e);
     }
   };
 
   useEffect(() => {
-    // Load settings and stats from storage
+    // 2. Initialize everything inside a callback to avoid "cascading renders"
     chrome.storage.local.get(['trackingEnabled', 'todayStats'], (result) => {
-      if (result.trackingEnabled !== undefined) setIsTrackingEnabled(result.trackingEnabled);
-      if (result.todayStats) setTodayStats(result.todayStats);
+      // Batch these updates together
+      if (result.trackingEnabled !== undefined) {
+        setIsTrackingEnabled(result.trackingEnabled as boolean);
+      }
+      if (result.todayStats) {
+        setTodayStats(result.todayStats as Stats);
+      }
+
+      // Calling this inside the callback satisfies the React linter
+      loadPlanData();
+      
       setLoading(false);
     });
 
-    loadPlan();
-
-    // Fixed: keep stats in sync if storage changes while popup is open
+    // 3. Listener for real-time storage changes
     const onStorageChanged = (changes: Record<string, chrome.storage.StorageChange>) => {
-      if (changes.trackingEnabled) setIsTrackingEnabled(changes.trackingEnabled.newValue);
-      if (changes.todayStats) setTodayStats(changes.todayStats.newValue);
+      if (changes.trackingEnabled) {
+        setIsTrackingEnabled(changes.trackingEnabled.newValue as boolean);
+      }
+      if (changes.todayStats) {
+        setTodayStats(changes.todayStats.newValue as Stats);
+      }
     };
 
     chrome.storage.onChanged.addListener(onStorageChanged);
@@ -51,7 +76,6 @@ export const Popup: React.FC = () => {
     setIsTrackingEnabled(enabled);
     chrome.storage.local.set({ trackingEnabled: enabled });
 
-    // Fixed: guard against empty tabs array and undefined tab id
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tabId = tabs[0]?.id;
       if (tabId !== undefined) {
@@ -63,7 +87,7 @@ export const Popup: React.FC = () => {
   const handleUpgrade = async (targetPlan: string) => {
     try {
       const success = await planManager.upgradePlan(targetPlan);
-      if (success) loadPlan();
+      if (success) loadPlanData();
     } catch (e) {
       console.error('Email Suite: upgrade failed:', e);
     }

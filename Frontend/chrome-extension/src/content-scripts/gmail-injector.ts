@@ -1,7 +1,6 @@
 import { GmailObserver } from '../utils/gmail-observer';
 import { TrackingManager } from '../utils/tracking-manager';
-import { GmailComposeWindow, GmailEmailElement } from '../types/gmail';
-
+import type { GmailComposeWindow, GmailEmailElement } from '../types/gmail';
 const GMAIL_NAV_SELECTOR = '[role="navigation"]';
 const WAIT_INTERVAL_MS = 500;
 const WAIT_TIMEOUT_MS = 30000; // 30s max wait

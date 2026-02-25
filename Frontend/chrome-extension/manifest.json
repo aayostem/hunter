@@ -2,20 +2,27 @@
     "manifest_version": 3,
     "name": "Email Suite - Email Tracker for Gmail",
     "version": "1.0.0",
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "contact@emailsuite.yourdomain.com",
+            "strict_min_version": "109.0"
+        }
+    },
     "description": "Track email opens, clicks, and boost productivity",
     "permissions": [
         "storage",
         "activeTab",
         "scripting",
-        "notifications",
-        "gmail"
+        "notifications"
     ],
     "host_permissions": [
         "https://mail.google.com/*",
         "https://*.emailsuite.com/*"
     ],
     "background": {
-        "service_worker": "dist/background.js",
+        "scripts": [
+            "dist/background.js"
+        ],
         "type": "module"
     },
     "content_scripts": [

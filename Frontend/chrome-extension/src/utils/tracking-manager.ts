@@ -1,4 +1,4 @@
-import { GmailComposeWindow, GmailEmailElement } from '../types/gmail';
+import type { GmailComposeWindow, GmailEmailElement } from '../types/gmail';
 
 export class TrackingManager {
   private apiEndpoint: string;

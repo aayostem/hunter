@@ -1,4 +1,4 @@
-import { GmailComposeWindow, GmailEmailElement, GmailObserverConfig } from '../types/gmail';
+import type { GmailComposeWindow, GmailEmailElement, GmailObserverConfig } from '../types/gmail';
 
 export class GmailObserver {
   private composeCallbacks: ((composeWindow: GmailComposeWindow) => void)[] = [];
