@@ -16,7 +16,7 @@ describe("AuthService", () => {
   describe("register", () => {
     it("should register a new user successfully", async () => {
       const userData = {
-        email: "test@example.com",
+        email: "lakabosch@gmail.com",
         password: "password123",
         name: "Test User",
       };
@@ -32,7 +32,7 @@ describe("AuthService", () => {
 
     it("should not register user with existing email", async () => {
       const userData = {
-        email: "test@example.com",
+        email: "lakabosch@gmail.com",
         password: "password123",
         name: "Test User",
       };
@@ -48,7 +48,7 @@ describe("AuthService", () => {
   describe("login", () => {
     it("should login user with correct credentials", async () => {
       const userData = {
-        email: "test@example.com",
+        email: "lakabosch@gmail.com",
         password: "password123",
         name: "Test User",
       };
@@ -63,7 +63,7 @@ describe("AuthService", () => {
 
     it("should not login with incorrect password", async () => {
       const userData = {
-        email: "test@example.com",
+        email: "lakabosch@gmail.com",
         password: "password123",
         name: "Test User",
       };
@@ -79,7 +79,7 @@ describe("AuthService", () => {
   describe("refreshToken", () => {
     it("should refresh tokens successfully", async () => {
       const userData = {
-        email: "test@example.com",
+        email: "lakabosch@gmail.com",
         password: "password123",
         name: "Test User",
       };

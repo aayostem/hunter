@@ -24,8 +24,12 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: RESEND_API_KEY
+      - key: GMAIL_USER
         sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: EmailSuite
       - key: SENTRY_DSN
         sync: false
       - key: LOGTAIL_SOURCE_TOKEN
@@ -43,8 +47,7 @@ services:
     repo: https://github.com/yourusername/emailsuite
     plan: starter
     region: oregon
-    dockerfilePath: ./Dockerfile
-    command: node dist/worker.js
+    dockerfilePath: ./Dockerfile.worker
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -55,6 +58,10 @@ services:
           type: redis
           name: emailsuite-redis
           property: connectionString
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
 
   - type: redis
     name: emailsuite-redis
@@ -65,5 +72,5 @@ services:
 databases:
   - name: emailsuite-db
     plan: starter
-    postgresMajorVersion: 15
+    postgresMajorVersion: "15"
     ipAllowList: []

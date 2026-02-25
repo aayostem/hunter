@@ -42,7 +42,6 @@
         "qrcode": "^1.5.4",
         "rate-limit-redis": "^3.0.1",
         "redis": "^4.6.7",
-        "resend": "^6.9.2",
         "socket.io": "^4.7.2",
         "stripe": "^13.3.0",
         "winston": "^3.19.0"

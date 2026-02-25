@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
@@ -8,8 +8,19 @@ import { AuthRequest, JwtPayload } from '../../types/auth';
 
 // ─── Email Service ────────────────────────────────────────────────────────────
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = `${process.env.EMAIL_FROM_NAME || 'EmailSuite'} <${process.env.EMAIL_FROM || 'noreply@emailsuite.com'}>`;
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
+
+// Add this temporarily
+console.log("Gmail user:", process.env.GMAIL_USER);
+console.log("App password length:", process.env.GMAIL_APP_PASSWORD?.length);
+
+const FROM = `${process.env.EMAIL_FROM_NAME || 'EmailSuite'} <${process.env.GMAIL_USER}>`;
 
 export interface Attachment {
   filename: string;
@@ -40,8 +51,8 @@ export class EmailService {
       subject: 'Verify Your Email',
       html: `<p>Click to verify: <a href="${d.verificationUrl}">Verify</a></p>`,
       text: `Verify: ${d.verificationUrl}`
-    })
-    // Add other templates here using the same pattern...
+    }),
+    // Add other templates here...
   };
 
   async sendEmail(opt: EmailOptions) {
@@ -56,23 +67,26 @@ export class EmailService {
         }
       }
 
-      const { data, error } = await resend.emails.send({
+      const info = await transporter.sendMail({
         from: FROM,
-        to: Array.isArray(to) ? to : [to],
+        to: Array.isArray(to) ? to.join(', ') : to,
         subject: subject || 'Notification',
         html: html || '',
         text: text || '',
         attachments: opt.attachments?.map(a => ({
           filename: a.filename,
-          content: a.content instanceof Buffer ? a.content.toString('base64') : a.content,
-          path: a.path
+          content: a.content,
+          path: a.path,
+          contentType: a.contentType,
         })),
-        tags: opt.tags ? Object.entries(opt.tags).map(([name, value]) => ({ name, value: String(value) })) : []
       });
 
-      if (error) throw error;
-      if (data?.id) await redis.setex(`email:${data.id}`, 86400, JSON.stringify({ to, sentAt: new Date() }));
-      return data;
+      // Cache sent email info in Redis
+      const emailId = info.messageId;
+      if (emailId) await redis.setex(`email:${emailId}`, 86400, JSON.stringify({ to, sentAt: new Date() }));
+
+      logger.info('Email sent', { messageId: emailId, to });
+      return info;
     } catch (e) {
       logger.error('Email Failed', { error: e, to: opt.to });
       throw e;
@@ -146,6 +160,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     res.status(500).json({ success: false, code: 'AUTH_ERROR', message: 'Authentication failed' });
   }
 };
+
 export const requireEmailVerification = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (!req.user?.emailVerified) {
     res.status(403).json({ success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Email verification required' });
@@ -154,8 +169,6 @@ export const requireEmailVerification = (req: AuthRequest, res: Response, next: 
   next();
 };
 
-// Fixed: removed redundant DB call — mfaEnabled is already on req.user from authenticate()
-// Fixed: MFA state now checked via session.mfaVerified (server-side) instead of x-mfa-verified header (client-controlled)
 export const requireMFA = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (req.user?.mfaEnabled && !req.session?.mfaVerified) {
     res.status(403).json({ success: false, code: 'MFA_REQUIRED', message: 'MFA verification required' });

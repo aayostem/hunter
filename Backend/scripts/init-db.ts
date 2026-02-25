@@ -18,8 +18,6 @@ async function main() {
     },
   });
 
-  console.log("Database initialized successfully");
-  console.log("Test user created:", user.email);
 }
 
 main()

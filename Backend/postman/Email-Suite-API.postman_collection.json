@@ -137,7 +137,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"name\": \"Test User\",\n  \"plan\": \"FREE\"\n}"
+              "raw": "{\n  \"email\": \"lakabosch@gmail.com\",\n  \"password\": \"SecurePass123!\",\n  \"name\": \"Test User\",\n  \"plan\": \"FREE\"\n}"
             }
           }
         },
@@ -181,7 +181,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"rememberMe\": true\n}"
+              "raw": "{\n  \"email\": \"lakabosch@gmail.com\",\n  \"password\": \"SecurePass123!\",\n  \"rememberMe\": true\n}"
             }
           }
         },
@@ -230,7 +230,7 @@
                   "pm.test(\"Get user successful\", function () {",
                   "    pm.response.to.have.status(200);",
                   "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.data.user.email).to.eql(\"test@example.com\");",
+                  "    pm.expect(jsonData.data.user.email).to.eql(\"lakabosch@gmail.com\");",
                   "});"
                 ]
               }
@@ -283,7 +283,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\"\n}"
+              "raw": "{\n  \"email\": \"lakabosch@gmail.com\"\n}"
             }
           }
         },
