@@ -5,7 +5,8 @@ import {
   WifiOff, CheckCircle, Search
 } from 'lucide-react';
 
-import { useAuth, User } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth';
+import type { User } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { api } from '../lib/api';
 import useDebounce from '../utils/usedebounce';

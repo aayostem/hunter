@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Papa, { ParseResult } from 'papaparse';
+import Papa from 'papaparse';
+import type { ParseResult } from 'papaparse';
 import { Plus, Search, Upload, Trash2, Edit, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../hooks/useToast';
