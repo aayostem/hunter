@@ -181,12 +181,13 @@ jobs:
         run: |
           npm ci
           npx prisma generate
+          npx prisma migrate deploy
           npm test
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/emailsuite_test
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test-secret
-
+        
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -221,6 +222,7 @@ jobs:
         run: |
           npm install -g wait-on
           wait-on ${{ secrets.API_URL }}/health --timeout 120000 || echo "Health check timed out"
+
   # 5. Deploy Web Dashboard to Vercel (main branch only)
   deploy-web-dashboard:
     needs: [frontends]
