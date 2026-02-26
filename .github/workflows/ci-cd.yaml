@@ -185,6 +185,7 @@ jobs:
           npm test
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/emailsuite_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/emailsuite_test
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test-secret
         
