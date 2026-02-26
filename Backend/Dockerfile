@@ -23,8 +23,8 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules/@prisma ./node_modul
 
 RUN npm ci --only=production
 
-COPY --chown=nodejs:nodejs docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN printf '#!/bin/sh\nset -e\necho "Running migrations..."\nnpx prisma migrate deploy\necho "Starting server..."\nexec node dist/index.js\n' > /usr/local/bin/docker-entrypoint.sh \
+  && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nodejs
 EXPOSE 3000
