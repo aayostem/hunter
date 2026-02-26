@@ -1,8 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "Running migrations..."
-npx prisma migrate deploy
+echo "🚀 Starting EmailSuite Backend..."
 
-echo "Starting server..."
-exec node dist/index.js
+echo "⏳ Running migrations..."
+DATABASE_URL=$DATABASE_URL npx prisma migrate deploy
+
+echo "✅ Migrations complete"
+echo "🌐 Starting server..."
+
+exec dumb-init node dist/index.js

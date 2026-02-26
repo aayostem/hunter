@@ -9,9 +9,7 @@ services:
     region: oregon
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: emailsuite-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           type: redis
@@ -39,8 +37,12 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: https://app.emailsuite.com
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
     healthCheckPath: /health
-    autoDeploy: true
+    autoDeploy: false
 
   # ─── Worker Service ────────────────────────────────────────────
   - type: worker
@@ -52,9 +54,7 @@ services:
     region: oregon
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: emailsuite-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           type: redis
@@ -64,17 +64,12 @@ services:
         sync: false
       - key: GMAIL_APP_PASSWORD
         sync: false
+      - key: NODE_ENV
+        value: production
 
   # ─── Redis ────────────────────────────────────────────────────
   - type: redis
     name: emailsuite-redis
     plan: starter
     maxmemoryPolicy: allkeys-lru
-    ipAllowList: []
-
-# ─── Database ───────────────────────────────────────────────────
-databases:
-  - name: emailsuite-db
-    plan: starter
-    postgresMajorVersion: "15"
     ipAllowList: []
