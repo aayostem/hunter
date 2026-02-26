@@ -32,4 +32,5 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV TZ=UTC
 
-ENTRYPOINT ["dumb-init", "docker-entrypoint.sh"]
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["sh", "/usr/local/bin/docker-entrypoint.sh"]
