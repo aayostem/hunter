@@ -181,7 +181,7 @@ jobs:
         run: |
           npm ci
           npx prisma generate
-          npx prisma migrate deploy
+          npx prisma db push
           npm test
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/emailsuite_test
