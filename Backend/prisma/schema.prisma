@@ -1,7 +1,7 @@
 generator client {
   provider = "prisma-client-js"
   // Enable preview features for better Supabase compatibility
-  previewFeatures = ["postgresqlExtensions"]
+  // previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
