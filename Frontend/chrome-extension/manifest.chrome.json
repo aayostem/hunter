@@ -7,30 +7,30 @@
         "storage",
         "activeTab",
         "scripting",
-        "notifications"
+        "notifications",
+        "alarms"
     ],
     "host_permissions": [
         "https://mail.google.com/*",
         "https://*.emailsuite.com/*"
     ],
     "background": {
-        "service_worker": "dist/background.js",
+        "service_worker": "background.js",
         "type": "module"
     },
     "content_scripts": [
         {
             "matches": ["https://mail.google.com/*"],
-            "js": ["dist/content-scripts/gmail-injector.js"],
-            "css": ["dist/styles/inject.css"]
+            "js": ["content-scripts/gmail-injector.js"]
         }
     ],
     "action": {
-        "default_popup": "dist/popup/index.html",
+        "default_popup": "src/popup/index.html",
         "default_title": "Email Suite"
     },
     "web_accessible_resources": [
         {
-            "resources": ["dist/tracking-pixel.png"],
+            "resources": ["vite.svg"],
             "matches": ["https://mail.google.com/*"]
         }
     ]

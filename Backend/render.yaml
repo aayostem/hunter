@@ -1,11 +1,12 @@
 services:
+  # ─── Web Service ───────────────────────────────────────────────
   - type: web
     name: emailsuite-backend
     runtime: image
-    repo: https://github.com/yourusername/emailsuite
+    image:
+      url: ghcr.io/yourusername/your-repo/backend:latest
     plan: starter
     region: oregon
-    dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -41,13 +42,14 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
+  # ─── Worker Service ────────────────────────────────────────────
   - type: worker
     name: emailsuite-worker
     runtime: image
-    repo: https://github.com/yourusername/emailsuite
+    image:
+      url: ghcr.io/yourusername/your-repo/backend:latest
     plan: starter
     region: oregon
-    dockerfilePath: ./Dockerfile.worker
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -63,12 +65,14 @@ services:
       - key: GMAIL_APP_PASSWORD
         sync: false
 
+  # ─── Redis ────────────────────────────────────────────────────
   - type: redis
     name: emailsuite-redis
     plan: starter
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
+# ─── Database ───────────────────────────────────────────────────
 databases:
   - name: emailsuite-db
     plan: starter

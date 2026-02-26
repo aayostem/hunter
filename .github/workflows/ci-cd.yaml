@@ -204,11 +204,11 @@ jobs:
             ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest
             ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}
 
-  # 4. Deployment (Render) - main branch only
-  deploy:
-    needs: [frontends, backend]
+  # 4. Deploy Backend to Render (main branch only)
+  deploy-backend:
+    needs: [backend]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
       - name: Trigger Render Deploy
@@ -216,10 +216,11 @@ jobs:
         with:
           service-id: ${{ secrets.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
+          # wait-for-success: true
 
-      - name: Wait for Deployment & Migrate
+      - name: Run Migrations
         run: |
-          echo "Waiting for Render to start deployment..."
+          echo "Waiting for Render to start..."
           sleep 30
           curl -X POST ${{ secrets.RENDER_MIGRATION_HOOK }} || echo "Migration hook failed but continuing"
 
@@ -228,7 +229,31 @@ jobs:
           npm install -g wait-on
           wait-on ${{ secrets.API_URL }}/health --timeout 120000 || echo "Health check timed out but continuing"
 
-  # 5. Release - tags only
+  # 5. Deploy Web Dashboard to Vercel (main branch only)
+  deploy-web-dashboard:
+    needs: [frontends]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        run: |
+          cd Frontend/web-dashboard
+          vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} \
+            --build-env VITE_API_URL=${{ secrets.VITE_API_URL }} \
+            --build-env VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }} \
+            --build-env VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+  # 6. Release - tags only
   release:
     needs: [frontends, backend, firefox-sign]
     runs-on: ubuntu-latest
