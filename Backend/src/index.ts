@@ -59,7 +59,12 @@ app.get("/metrics", async (req, res) => {
 
 // Error handling middleware
 app.use(
-  (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  (
+    err: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
     ErrorTracker.captureError(err, {
       url: req.url,
       method: req.method,
@@ -72,7 +77,8 @@ app.use(
     });
     res.status(500).json({
       error: "Internal server error",
-      message: process.env.NODE_ENV === "development" ? err.message : undefined,
+      message:
+        process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 );
@@ -82,16 +88,33 @@ app.use("*", (req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// Start server — bind to 0.0.0.0 so Render's port scanner can detect it
-server.listen(config.port, "0.0.0.0", async () => {
-  console.log(`🚀 Server running on port ${config.port}`);
-  logger.info(`Email Suite API running on port ${config.port}`);
-  logger.info(`WebSocket server initialized`);
-
-  // Connect Redis AFTER port is open — prevents startup crash if Redis is unavailable
-  try {
-    await redis.connect();
-  } catch (err) {
-    logger.warn("⚠️ Redis unavailable at startup — continuing without cache");
-  }
+// Uncaught error handlers — must be registered before listen
+process.on("uncaughtException", (err) => {
+  console.error("💥 Uncaught exception:", err);
+  process.exit(1);
 });
+
+process.on("unhandledRejection", (reason) => {
+  console.error("💥 Unhandled rejection:", reason);
+  process.exit(1);
+});
+
+// Start server
+const PORT = config.port;
+console.log(`⚡ Binding to port ${PORT}...`);
+
+try {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`✅ Server bound to port ${PORT}`);
+    logger.info(`Email Suite API running on port ${PORT}`);
+    logger.info(`WebSocket server initialized`);
+
+    // Connect Redis after port is open — non-blocking
+    redis.connect().catch((err: any) => {
+      logger.warn(`⚠️ Redis unavailable at startup: ${err.message}`);
+    });
+  });
+} catch (err) {
+  console.error("❌ Failed to start server:", err);
+  process.exit(1);
+}
