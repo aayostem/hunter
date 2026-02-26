@@ -39,6 +39,8 @@ const redis = new Redis(config.redis.url, {
   maxRetriesPerRequest: config.redis.maxRetriesPerRequest,
   retryStrategy: config.redis.retryStrategy,
   tls: config.redis.url.startsWith("rediss://") ? {} : undefined,
+  lazyConnect: true,      // ← don't connect until first command
+  enableOfflineQueue: false, // ← don't queue commands while disconnected
 });
 
 redis.on("connect", () => console.log("✅ Redis connected"));
