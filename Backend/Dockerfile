@@ -2,10 +2,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 COPY package.json package-lock.json* ./
-COPY prisma ./prisma/
 RUN npm ci
-RUN npx prisma generate
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 # Production stage
@@ -27,9 +26,9 @@ RUN printf '#!/bin/sh\nset -e\necho "Running migrations..."\nnpx prisma migrate 
   && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nodejs
-EXPOSE 3000
+EXPOSE 10000
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=10000
 ENV TZ=UTC
 
 ENTRYPOINT ["dumb-init", "--"]
