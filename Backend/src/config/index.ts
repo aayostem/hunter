@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const config = {
-  port: parseInt(process.env.PORT || 1377),
+  port: parseInt(process.env.PORT || '1377'),
   database: {
     url:
       process.env.DATABASE_URL ||
