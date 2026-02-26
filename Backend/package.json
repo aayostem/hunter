@@ -13,6 +13,8 @@
         "db:generate": "prisma generate",
         "db:push": "prisma db push",
         "db:migrate": "prisma migrate dev  --name init",
+        "migrate": "tsx scripts/migrate.ts",
+        "migrate:deploy": "prisma migrate deploy",
         "db:studio": "prisma studio",
         "script:init-db": "tsx scripts/init-db.ts"
     },

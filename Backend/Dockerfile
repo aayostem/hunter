@@ -41,5 +41,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV TZ=UTC
 
-ENTRYPOINT ["dumb-init", "--", "docker-entrypoint.sh"]
-CMD ["node", "dist/server.js"]
+RUN npx prisma generate
+
+# Add entrypoint script
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]

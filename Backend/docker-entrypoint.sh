@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "Running database migrations..."
+echo "Running migrations..."
 npx prisma migrate deploy
 
-echo "Starting application..."
-exec "$@"
+echo "Starting server..."
+exec node dist/index.js

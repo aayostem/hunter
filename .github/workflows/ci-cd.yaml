@@ -216,19 +216,11 @@ jobs:
         with:
           service-id: ${{ secrets.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
-          # wait-for-success: true
-
-      - name: Run Migrations
-        run: |
-          echo "Waiting for Render to start..."
-          sleep 30
-          curl -X POST ${{ secrets.RENDER_MIGRATION_HOOK }} || echo "Migration hook failed but continuing"
 
       - name: Health Check
         run: |
           npm install -g wait-on
-          wait-on ${{ secrets.API_URL }}/health --timeout 120000 || echo "Health check timed out but continuing"
-
+          wait-on ${{ secrets.API_URL }}/health --timeout 120000 || echo "Health check timed out"
   # 5. Deploy Web Dashboard to Vercel (main branch only)
   deploy-web-dashboard:
     needs: [frontends]
