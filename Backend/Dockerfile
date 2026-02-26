@@ -3,9 +3,8 @@ WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 COPY package.json package-lock.json* ./
 RUN npm ci
-COPY prisma ./prisma/
-RUN npx prisma generate
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 # Production stage
@@ -23,14 +22,13 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules/@prisma ./node_modul
 
 RUN npm ci --only=production
 
-RUN printf '#!/bin/sh\nset -e\necho "Running migrations..."\nnpx prisma migrate deploy\necho "Starting server..."\nexec node dist/index.js\n' > /usr/local/bin/docker-entrypoint.sh \
-  && chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY --chown=nodejs:nodejs docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nodejs
-EXPOSE 10000
+EXPOSE 3000
 ENV NODE_ENV=production
-ENV PORT=10000
+ENV PORT=3000
 ENV TZ=UTC
 
-ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["dumb-init", "docker-entrypoint.sh"]
