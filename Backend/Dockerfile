@@ -4,8 +4,9 @@ RUN apk add --no-cache openssl libc6-compat
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
-RUN npx prisma generate
+RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
+RUN npm prune --production
 
 # Production stage
 FROM node:20-alpine
@@ -17,11 +18,9 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/package-lock.json* ./
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN npm ci --only=production
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nodejs

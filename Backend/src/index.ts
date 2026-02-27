@@ -108,11 +108,6 @@ try {
     console.log(`✅ Server bound to port ${PORT}`);
     logger.info(`Email Suite API running on port ${PORT}`);
     logger.info(`WebSocket server initialized`);
-
-    // Connect Redis after port is open — non-blocking
-    redis.connect().catch((err: any) => {
-      logger.warn(`⚠️ Redis unavailable at startup: ${err.message}`);
-    });
   });
 } catch (err) {
   console.error("❌ Failed to start server:", err);
