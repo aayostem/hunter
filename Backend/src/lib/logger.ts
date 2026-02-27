@@ -1,8 +1,17 @@
 import winston from 'winston';
 import { Logtail } from '@logtail/node';
 import { LogtailTransport } from '@logtail/winston';
+import fs from 'fs';
 
 const { combine, timestamp, json, errors, printf, colorize } = winston.format;
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Ensure logs directory exists (use /tmp in production for write permissions)
+const logDir = isProduction ? '/tmp/logs' : 'logs';
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
 
 // Custom format for console in development
 const consoleFormat = printf(({ level, message, timestamp, ...meta }) => {
@@ -10,11 +19,10 @@ const consoleFormat = printf(({ level, message, timestamp, ...meta }) => {
   return `${timestamp} [${level}]: ${message}${metaStr}`;
 });
 
-// Create transports array
 const transports: winston.transport[] = [];
 
-// Console transport for all environments
-if (process.env.NODE_ENV === 'development') {
+// Console transport
+if (!isProduction) {
   transports.push(
     new winston.transports.Console({
       format: combine(
@@ -32,8 +40,8 @@ if (process.env.NODE_ENV === 'development') {
   );
 }
 
-// Add Logtail (Better Stack) in production
-if (process.env.NODE_ENV === 'production' && process.env.LOGTAIL_SOURCE_TOKEN) {
+// Logtail in production
+if (isProduction && process.env.LOGTAIL_SOURCE_TOKEN) {
   try {
     const logtail = new Logtail(process.env.LOGTAIL_SOURCE_TOKEN);
     transports.push(new LogtailTransport(logtail));
@@ -42,21 +50,21 @@ if (process.env.NODE_ENV === 'production' && process.env.LOGTAIL_SOURCE_TOKEN) {
   }
 }
 
-// File transport for errors in all environments
+// File transport for errors
 transports.push(
   new winston.transports.File({
-    filename: 'logs/error.log',
+    filename: `${logDir}/error.log`,
     level: 'error',
-    maxsize: 10485760, // 10MB
+    maxsize: 10485760,
     maxFiles: 5,
   })
 );
 
-// File transport for all logs
-if (process.env.NODE_ENV !== 'production') {
+// File transport for all logs in development
+if (!isProduction) {
   transports.push(
     new winston.transports.File({
-      filename: 'logs/combined.log',
+      filename: `${logDir}/combined.log`,
       maxsize: 10485760,
       maxFiles: 5,
     })
@@ -70,9 +78,9 @@ export const logger = winston.createLogger({
     timestamp(),
     json()
   ),
-  defaultMeta: { 
+  defaultMeta: {
     service: 'emailsuite-backend',
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV
   },
   transports,
   exceptionHandlers: transports,
@@ -80,7 +88,6 @@ export const logger = winston.createLogger({
   exitOnError: false
 });
 
-// Create a child logger with request context
 export const createRequestLogger = (req: any) => {
   return logger.child({
     requestId: req.id,
@@ -92,8 +99,5 @@ export const createRequestLogger = (req: any) => {
   });
 };
 
-// Metrics logger
 export const metricsLogger = logger.child({ type: 'metric' });
-
-// Security logger for audit trails
 export const securityLogger = logger.child({ type: 'security' });
