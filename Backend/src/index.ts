@@ -100,15 +100,27 @@ process.on("unhandledRejection", (reason) => {
 
 // Start server
 const PORT = config.port;
-console.log(`⚡ Binding to port ${PORT}...`);
+console.log(`⚡ About to bind to port ${PORT}...`);
+console.log(`⚡ Config port value: ${PORT}`);
+console.log(`⚡ Process env PORT: ${process.env.PORT}`);
 
 try {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`✅ Server bound to port ${PORT}`);
     logger.info(`Email Suite API running on port ${PORT}`);
-    logger.info(`WebSocket server initialized`);
+  });
+
+  server.on('error', (err) => {
+    console.error('❌ Server error:', err);
+    process.exit(1);
   });
 } catch (err) {
   console.error("❌ Failed to start server:", err);
   process.exit(1);
 }
+
+console.log('✅ Imports loaded');
+console.log('✅ Creating app...');
+console.log('✅ App created');
+new NotificationServer(server);
+console.log('✅ WebSocket initialized');
