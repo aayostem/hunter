@@ -4,14 +4,12 @@ WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci && ls node_modules/.bin/prisma || echo "prisma binary missing"
+RUN npm install prisma@5.22.0 --save-dev
 
 COPY . .
-
 RUN node_modules/.bin/prisma generate
-
 RUN npm run build
-
 RUN npm prune --production
 
 # ─── Production ───────────────────────────────────────────────
@@ -19,7 +17,6 @@ FROM node:20-alpine
 WORKDIR /app
 
 RUN apk add --no-cache tzdata dumb-init openssl libc6-compat
-
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
