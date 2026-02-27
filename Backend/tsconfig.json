@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
+    "module": "CommonJS",
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -24,14 +24,8 @@
     "noImplicitOverride": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    "noImplicitAny": false // Only disables implicit any
+    "noImplicitAny": false
   },
-  "include": [
-    "src/**/*"
-, "utils"  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts"
-  ],
+  "include": ["src/**/*", "utils"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
