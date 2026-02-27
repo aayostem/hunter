@@ -9,13 +9,18 @@ import { AuthRequest, JwtPayload } from '../../types/auth';
 // ─── Email Service ────────────────────────────────────────────────────────────
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
+  connectionTimeout: 30000,
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
 });
-
 // Add this temporarily
 console.log("Gmail user:", process.env.GMAIL_USER);
 console.log("App password length:", process.env.GMAIL_APP_PASSWORD?.length);

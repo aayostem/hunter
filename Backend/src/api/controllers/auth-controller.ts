@@ -27,25 +27,28 @@ export class AuthController {
     this.disableMFA = this.disableMFA.bind(this);
   }
   // --- PUBLIC ---
-
 async register(req: Request, res: Response) {
   return this.exec(res, 'register', async () => {
     const { email, password, name } = req.body;
+
+    // Check if user already exists
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return { status: 409, data: { message: 'Email already registered' } };
+    }
+
     const hashed = await bcrypt.hash(password, 12);
     const vToken = crypto.randomBytes(32).toString('hex');
     const user = await prisma.user.create({
-      data: { 
-        email, 
-        name, 
-        password: hashed, 
-        verificationToken: vToken 
-      }
+      data: { email, name, password: hashed, verificationToken: vToken }
     });
+
     await sendEmail({
       to: email,
       template: 'email-verification',
       data: { verificationUrl: `${process.env.APP_URL}/verify?token=${vToken}` }
     });
+
     return { status: 201, data: { user: this.sanitize(user), requiresVerification: true } };
   });
 }
