@@ -28,22 +28,27 @@ export class AuthController {
   }
   // --- PUBLIC ---
 
-  async register(req: Request, res: Response) {
-    return this.exec(res, 'register', async () => {
-      const { email, password, name, ...rest } = req.body;
-      const hashed = await bcrypt.hash(password, 12);
-      const vToken = crypto.randomBytes(32).toString('hex');
-      const user = await prisma.user.create({
-        data: { email, name, password: hashed, verificationToken: vToken, ...rest }
-      });
-      await sendEmail({
-        to: email,
-        template: 'email-verification',
-        data: { verificationUrl: `${process.env.APP_URL}/verify?token=${vToken}` }
-      });
-      return { status: 201, data: { user: this.sanitize(user), requiresVerification: true } };
+async register(req: Request, res: Response) {
+  return this.exec(res, 'register', async () => {
+    const { email, password, name } = req.body;
+    const hashed = await bcrypt.hash(password, 12);
+    const vToken = crypto.randomBytes(32).toString('hex');
+    const user = await prisma.user.create({
+      data: { 
+        email, 
+        name, 
+        password: hashed, 
+        verificationToken: vToken 
+      }
     });
-  }
+    await sendEmail({
+      to: email,
+      template: 'email-verification',
+      data: { verificationUrl: `${process.env.APP_URL}/verify?token=${vToken}` }
+    });
+    return { status: 201, data: { user: this.sanitize(user), requiresVerification: true } };
+  });
+}
 
   async login(req: Request, res: Response) {
     return this.exec(res, 'login', async () => {
