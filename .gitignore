@@ -220,9 +220,9 @@ wheels/
 # ============================
 
 # Prisma
-**/prisma/migrations/
-!**/prisma/migrations/**/*.sql
-**/prisma/*.db
+# **/prisma/migrations/
+# !**/prisma/migrations/**/*.sql
+# **/prisma/*.db
 
 # Backend
 backend/.env
@@ -368,8 +368,8 @@ backups/
 !.vscode/extensions.json.example
 
 # Keep Prisma migrations (but not the .db files)
-!**/prisma/migrations/
-**/prisma/migrations/**/*.sql
+# !**/prisma/migrations/
+# **/prisma/migrations/**/*.sql
 
 # Keep sample environment files
 !.env.example
