@@ -6,17 +6,13 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || "10000", 10),
   database: {
-    url:
-      process.env.DATABASE_URL ||
-      "postgresql://admin:password@localhost:5432/emailsuite",
+    url: process.env.DATABASE_URL || "postgresql://admin:password@localhost:5432/emailsuite",
   },
   redis: {
-    url: process.env.REDIS_URL || "redis://:redispassword@localhost:6379",
-    password: process.env.REDIS_PASSWORD || "redispassword",
-    enabled: true,
+    url: process.env.REDIS_URL || "redis://localhost:6379",
+    password: process.env.REDIS_PASSWORD || "",
     connectTimeout: 10000,
     maxRetriesPerRequest: 3,
-    retryStrategy: (times: number) => Math.min(times * 50, 2000),
   },
   jwt: {
     secret: process.env.JWT_SECRET || "email-suite-secret-key",
@@ -34,13 +30,13 @@ export const config = {
 };
 
 const redis = new Redis(config.redis.url, {
-  password: config.redis.password,
+  password: config.redis.password || undefined,
   connectTimeout: config.redis.connectTimeout,
   maxRetriesPerRequest: config.redis.maxRetriesPerRequest,
-  retryStrategy: config.redis.retryStrategy,
+  retryStrategy: (times) => Math.min(times * 50, 2000),
   tls: config.redis.url.startsWith("rediss://") ? {} : undefined,
-  lazyConnect: true,
-  enableOfflineQueue: false,
+  lazyConnect: false,        // connect immediately
+  enableOfflineQueue: true,  // queue commands while connecting
 });
 
 redis.on("connect", () => console.log("✅ Redis connected"));

@@ -4,7 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import { config } from "./config";
-import redis from "./config";
+// import redis from "./lib/redis"; 
 import { trackingRoutes } from "./api/routes/tracking";
 import { authRoutes } from "./api/routes/auth";
 import { campaignRoutes } from "./api/routes/campaigns";

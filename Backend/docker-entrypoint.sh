@@ -7,6 +7,6 @@ echo "⏳ Running migrations..."
 node_modules/.bin/prisma migrate deploy
 
 echo "✅ Migrations complete"
-echo "🌐 Starting server..."
+echo "🌐 Starting server on port 3000..."
 
-exec dumb-init node dist/index.js
+exec node dist/index.js
