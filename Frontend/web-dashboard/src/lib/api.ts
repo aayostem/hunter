@@ -15,7 +15,7 @@ interface RequestOptions {
 class ApiClient {
   private baseURL: string;
 
-  constructor(baseURL: string = '/api') {
+  constructor(baseURL: string = import.meta.env.VITE_API_BASE_URL || '') {
     this.baseURL = baseURL;
   }
 

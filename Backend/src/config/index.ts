@@ -6,7 +6,9 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || "10000", 10),
   database: {
-    url: process.env.DATABASE_URL || "postgresql://admin:password@localhost:5432/emailsuite",
+    url:
+      process.env.DATABASE_URL ||
+      "postgresql://admin:password@localhost:5432/emailsuite",
   },
   redis: {
     url: process.env.REDIS_URL || "redis://localhost:6379",
@@ -23,7 +25,9 @@ export const config = {
     clickPath: "/track/click",
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(",")
+      : ["http://localhost:5173", "http://localhost:3000"],
     credentials: true,
     optionsSuccessStatus: 200,
   },
@@ -35,8 +39,8 @@ const redis = new Redis(config.redis.url, {
   maxRetriesPerRequest: config.redis.maxRetriesPerRequest,
   retryStrategy: (times) => Math.min(times * 50, 2000),
   tls: config.redis.url.startsWith("rediss://") ? {} : undefined,
-  lazyConnect: false,        // connect immediately
-  enableOfflineQueue: true,  // queue commands while connecting
+  lazyConnect: false, // connect immediately
+  enableOfflineQueue: true, // queue commands while connecting
 });
 
 redis.on("connect", () => console.log("✅ Redis connected"));
