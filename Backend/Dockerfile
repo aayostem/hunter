@@ -19,10 +19,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/package-lock.js
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nodejs:nodejs /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN npm ci --only=production
-
-COPY --chown=nodejs:nodejs docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nodejs
