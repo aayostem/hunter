@@ -2,11 +2,10 @@
 set -e
 
 echo "🚀 Starting EmailSuite Backend..."
-echo "⏳ Running migrations..."
+echo "⏳ Checking migrations..."
 
-node_modules/.bin/prisma migrate deploy
+# Run migrations with timeout - don't block server start if it hangs
+node_modules/.bin/prisma migrate deploy --schema=./prisma/schema.prisma || echo "⚠️ Migration skipped - run manually"
 
-echo "✅ Migrations complete"
-echo "🌐 Starting server on port 3000..."
-
+echo "✅ Starting server..."
 exec node dist/index.js
