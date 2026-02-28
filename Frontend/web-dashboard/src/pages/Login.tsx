@@ -1,12 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Mail, Lock, Eye, EyeOff, AlertCircle, Loader, Shield, WifiOff
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Loader,
+  Shield,
+  WifiOff,
+} from "lucide-react";
 
-import { useAuth } from '../hooks/useAuth';
-import { trackEvent } from '../utils/analytics';
-import { logError } from '../utils/logging';
+import { useAuth } from "../hooks/useAuth";
+import { trackEvent } from "../utils/analytics";
+import { logError } from "../utils/logging";
 
 // --- Types ---
 interface LocationState {
@@ -20,10 +27,10 @@ export const Login: React.FC = () => {
 
   // --- State ---
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
     rememberMe: false,
-    mfaCode: '',
+    mfaCode: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -33,56 +40,67 @@ export const Login: React.FC = () => {
   const [showMFA, setShowMFA] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  const from = (location.state as LocationState)?.from?.pathname || '/dashboard';
+  const from =
+    (location.state as LocationState)?.from?.pathname || "/dashboard";
 
   // --- Effects ---
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
   useEffect(() => {
     if (cooldown > 0) {
-      const timer = setInterval(() => setCooldown(p => Math.max(0, p - 1)), 1000);
+      const timer = setInterval(
+        () => setCooldown((p) => Math.max(0, p - 1)),
+        1000
+      );
       return () => clearInterval(timer);
     }
   }, [cooldown]);
 
   // --- Handlers ---
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    setError(null);
-  }, []);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value, type, checked } = e.target;
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      }));
+      setError(null);
+    },
+    []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cooldown > 0 || !isOnline) return;
-    
+
     setIsLoading(true);
     setError(null);
 
     try {
       const result = await login(formData.email, formData.password);
-      
       if (result.mfaRequired) {
         setShowMFA(true);
       } else {
-        trackEvent('login_success', { email: formData.email });
+        trackEvent("login_success", { email: formData.email });
         navigate(from, { replace: true });
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : "Login failed";
       setError(message);
-      logError('Login attempt failed', err instanceof Error ? err : new Error(String(err)));
-      
-      if (message.toLowerCase().includes('too many requests')) {
+      logError(
+        "Login attempt failed",
+        err instanceof Error ? err : new Error(String(err))
+      );
+      if (message.toLowerCase().includes("too many requests")) {
         setCooldown(60);
       }
     } finally {
@@ -97,10 +115,12 @@ export const Login: React.FC = () => {
 
     try {
       await verifyMFA(formData.mfaCode);
-      trackEvent('mfa_success');
+      trackEvent("mfa_success");
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid verification code.');
+      setError(
+        err instanceof Error ? err.message : "Invalid verification code."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +136,9 @@ export const Login: React.FC = () => {
               <Shield className="w-6 h-6 text-blue-600" />
             </div>
             <h2 className="text-2xl font-bold">Two-Factor Authentication</h2>
-            <p className="text-gray-500 mt-2">Enter the 6-digit code from your app</p>
+            <p className="text-gray-500 mt-2">
+              Enter the 6-digit code from your app
+            </p>
           </div>
 
           <form onSubmit={handleMFAVerifySubmit} className="space-y-6">
@@ -135,10 +157,14 @@ export const Login: React.FC = () => {
               disabled={isLoading || formData.mfaCode.length < 6}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all"
             >
-              {isLoading ? <Loader className="w-5 h-5 animate-spin mx-auto" /> : 'Verify Code'}
+              {isLoading ? (
+                <Loader className="w-5 h-5 animate-spin mx-auto" />
+              ) : (
+                "Verify Code"
+              )}
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setShowMFA(false)}
               className="w-full text-gray-500 text-sm hover:underline"
             >
@@ -156,7 +182,8 @@ export const Login: React.FC = () => {
         {/* Offline Alert */}
         {!isOnline && (
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg flex items-center gap-2 text-sm">
-            <WifiOff className="w-4 h-4" /> You are currently offline. Login is disabled.
+            <WifiOff className="w-4 h-4" /> You are currently offline. Login is
+            disabled.
           </div>
         )}
 
@@ -174,7 +201,9 @@ export const Login: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <input
@@ -189,11 +218,13 @@ export const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
@@ -205,30 +236,42 @@ export const Login: React.FC = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-gray-400"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
-
             <button
               type="submit"
               disabled={isLoading || cooldown > 0 || !isOnline}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all"
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-400 transition-all flex items-center justify-center gap-2 min-h-[48px]"
             >
               {isLoading ? (
-                <Loader className="w-5 h-5 animate-spin mx-auto" />
+                <>
+                  <Loader className="w-5 h-5 animate-spin shrink-0" />
+                  <span>Signing in...</span>
+                </>
               ) : !isOnline ? (
-                'Waiting for connection...'
+                <span>Waiting for connection...</span>
               ) : cooldown > 0 ? (
-                `Wait ${cooldown}s`
+                <span>Wait {cooldown}s</span>
               ) : (
-                'Sign In'
+                <span>Sign In</span>
               )}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            Don't have an account? <Link to="/register" className="text-blue-600 font-medium hover:underline">Sign up</Link>
+            Don't have an account?{" "}
+            <Link
+              to="/register"
+              className="text-blue-600 font-medium hover:underline"
+            >
+              Sign up
+            </Link>
           </p>
         </div>
       </div>

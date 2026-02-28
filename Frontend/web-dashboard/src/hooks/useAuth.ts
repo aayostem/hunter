@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { AuthError } from '@supabase/supabase-js';
 
-// --- Types ---
 export interface User {
   id: string;
   email: string;
@@ -24,10 +23,7 @@ interface MFAFactor {
 }
 
 interface MFAVerifyResponse {
-  session: {
-    id: string;
-    expiresAt: string;
-  };
+  session: { id: string; expiresAt: string };
 }
 
 interface MFASetupResponse {
@@ -38,7 +34,7 @@ interface MFASetupResponse {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null; // Added token to interface
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -57,14 +53,10 @@ interface AuthContextType {
   getMFAFactors: () => Promise<{ totp: MFAFactor[] }>;
 }
 
-// --- Supabase Client ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.log("hello supabae")
-  console.log("supababseUrl:", supabaseUrl);
-  console.log("supabaseAnonKey:", supabaseAnonKey);
   throw new Error('Missing Supabase environment variables');
 }
 
@@ -79,10 +71,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// --- Provider ---
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null); // State to hold the JWT
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingMFA, setPendingMFA] = useState<{ factorId: string; challengeId: string } | null>(null);
@@ -94,75 +85,86 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const mapSupabaseUser = useCallback(async (supabaseUser: SupabaseUser): Promise<User> => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', supabaseUser.id)
-      .single();
+  // maybeSingle() returns null instead of throwing when no row found
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', supabaseUser.id)
+    .maybeSingle(); // ← the fix
 
-    let mfaEnabled = false;
-    try {
-      const { data: mfaData } = await supabase.auth.mfa.listFactors();
-      mfaEnabled = mfaData?.totp?.some(f => f.status === 'verified') ?? false;
-    } catch {
-      mfaEnabled = false;
-    }
+  let mfaEnabled = false;
+  try {
+    const { data: mfaData } = await supabase.auth.mfa.listFactors();
+    mfaEnabled = mfaData?.totp?.some(f => f.status === 'verified') ?? false;
+  } catch {
+    mfaEnabled = false;
+  }
 
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email ?? '',
-      name: profile?.name || supabaseUser.user_metadata?.name || 'User',
-      avatar: profile?.avatar_url || supabaseUser.user_metadata?.avatar_url,
-      plan: profile?.plan || 'free',
-      emailVerified: !!supabaseUser.email_confirmed_at,
-      createdAt: supabaseUser.created_at,
-      mfaEnabled,
-    };
-  }, []);
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email ?? '',
+    name: profile?.name || supabaseUser.user_metadata?.name || 'User',
+    avatar: profile?.avatar_url || supabaseUser.user_metadata?.avatar_url,
+    plan: profile?.plan || 'free',
+    emailVerified: !!supabaseUser.email_confirmed_at,
+    createdAt: supabaseUser.created_at,
+    mfaEnabled,
+  };
+}, []);
 
-  // --- Auth State Observer ---
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
+  let initialized = false;
 
-    const initializeAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
       if (!mounted) return;
 
       if (session) {
-        const mappedUser = await mapSupabaseUser(session.user);
-        setUser(mappedUser);
-        setToken(session.access_token); // Set token on init
-      }
-      setIsLoading(false);
-    };
-
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        
-        if (session) {
+        try {
           const mappedUser = await mapSupabaseUser(session.user);
-          setUser(mappedUser);
-          setToken(session.access_token); // Set token on change
-        } else {
+          if (mounted) {
+            setUser(mappedUser);
+            setToken(session.access_token);
+          }
+        } catch {
+          if (mounted) {
+            setUser(null);
+            setToken(null);
+          }
+        }
+      } else {
+        if (mounted) {
           setUser(null);
           setToken(null);
         }
-
-        if (event === 'SIGNED_IN') trackEvent('login', { method: 'supabase' });
-        if (event === 'SIGNED_OUT') setToken(null);
       }
-    );
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [mapSupabaseUser, trackEvent]);
+      if (!initialized) {
+        initialized = true;
+        if (mounted) setIsLoading(false);
+      }
 
-  // --- Methods ---
+      if (event === 'SIGNED_IN') trackEvent('login', { method: 'supabase' });
+      if (event === 'SIGNED_OUT') setToken(null);
+    }
+  );
+
+  // Fallback — if Supabase never fires any event, stop loading after 3s
+  const fallback = setTimeout(() => {
+    if (mounted && !initialized) {
+      initialized = true;
+      setIsLoading(false);
+    }
+  }, 3000);
+
+  return () => {
+    mounted = false;
+    clearTimeout(fallback);
+    subscription.unsubscribe();
+  };
+}, [mapSupabaseUser, trackEvent]);
+
   const login = useCallback(async (email: string, password: string) => {
     setError(null);
     try {
@@ -175,7 +177,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (factor && data.user) {
         const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factor.id });
         if (challengeError) throw challengeError;
-
         setPendingMFA({ factorId: factor.id, challengeId: challengeData.id });
         return { mfaRequired: true, sessionId: challengeData.id };
       }
@@ -192,15 +193,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyMFA = useCallback(async (code: string): Promise<MFAVerifyResponse> => {
     if (!pendingMFA) throw new Error('No pending MFA challenge');
     const { factorId, challengeId } = pendingMFA;
-
     const { error: verifyError } = await supabase.auth.mfa.verify({ factorId, challengeId, code });
     if (verifyError) throw verifyError;
-
     setPendingMFA(null);
     const { data: { session } } = await supabase.auth.getSession();
-    
     setToken(session?.access_token || null);
-
     return {
       session: {
         id: session?.access_token || '',
@@ -222,10 +219,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyMFASetup = useCallback(async (factorId: string, code: string) => {
     const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
     if (challengeError) throw challengeError;
-
     const { error: verifyError } = await supabase.auth.mfa.verify({ factorId, challengeId: challengeData.id, code });
     if (verifyError) throw verifyError;
-
     if (user) setUser({ ...user, mfaEnabled: true });
   }, [user]);
 
@@ -256,10 +251,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
-    const { data, error: signUpError } = await supabase.auth.signUp({ 
-      email, 
-      password, 
-      options: { data: { name }, emailRedirectTo: `${window.location.origin}/auth/verify` } 
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name }, emailRedirectTo: `${window.location.origin}/auth/verify` }
     });
     if (signUpError) throw signUpError;
     if (data.user) {
@@ -288,24 +283,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const value: AuthContextType = {
-    user, 
-    token, // Provided to the application
-    isAuthenticated: !!user, 
-    isLoading, 
-    error,
-    login, 
-    logout, 
-    register, 
-    loginWithGoogle, 
-    loginWithGithub,
-    forgotPassword, 
-    resetPassword, 
-    updateUser,
-    verifyMFA, 
-    setupMFA, 
-    verifyMFASetup, 
-    disableMFA, 
-    getMFAFactors,
+    user, token, isAuthenticated: !!user, isLoading, error,
+    login, logout, register, loginWithGoogle, loginWithGithub,
+    forgotPassword, resetPassword, updateUser,
+    verifyMFA, setupMFA, verifyMFASetup, disableMFA, getMFAFactors,
   };
 
   return React.createElement(AuthContext.Provider, { value }, children);
